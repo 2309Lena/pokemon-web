@@ -295,10 +295,18 @@
       <section id="panel-relics" class="tab-panel">
         <div class="panel-header-row">
           <div>
-            <h2><img class="px-icon lg" src="/static/assets/relics/crimson_claw.png" alt="" /> Kho Relic Buff Chỉ Số</h2>
-            <p class="muted">Mỗi Relic sở hữu hiệu ứng animation riêng biệt! Trang bị tối đa <strong>3 Relic</strong> để cộng thẳng vào ATK, DEF, SPD, HP, Tỉ lệ bắt, Coins & Shiny.</p>
+            <h2><img class="px-icon lg" src="/static/assets/relics/crimson_claw.png" alt="" /> Kho 56 Relic Buff Chỉ Số (Common → Mythic)</h2>
+            <p class="muted">Đánh quái có tỉ lệ rơi Relic ngẫu nhiên (Legend 1.2% · Mythic 0.3%) hoặc mua bằng Coins! Trang bị tối đa <strong>3 Relic</strong>.</p>
           </div>
           <div id="relic-bonus-summary" class="hud-pill highlight-open">Đang kích hoạt: 0/3</div>
+        </div>
+        <div class="pp-console" style="margin-bottom:14px;">
+          <div class="pp-search-row">
+            <input id="relic-search" class="pp-search-input" type="text" placeholder="Tìm tên Relic hoặc chỉ số buff (vd: ATK, Shiny, Arceus)..." oninput="renderRelics()" />
+            <span id="relic-count-label" class="pp-count-label">0/56 Relic</span>
+          </div>
+          <div class="pp-chip-row" id="relic-tier-chips"></div>
+          <div class="pp-chip-row" id="relic-own-chips"></div>
         </div>
         <div id="relics-grid" class="relics-grid"></div>
       </section>

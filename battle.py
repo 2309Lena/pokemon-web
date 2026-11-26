@@ -13,7 +13,7 @@ from db import (
     get_user_team,
     mark_pokedex_seen,
 )
-from relics_missions import get_relic_bonuses, record_mission_event
+from relics_missions import get_relic_bonuses, record_mission_event, roll_relic_drop
 from world_data import COUNTRIES_BY_ID, POKEMON_BY_ID, POKEMON_LIST, get_country_encounter
 from moves_catalog import build_moves_for_species as _build_species_moves
 
@@ -404,12 +404,22 @@ def _finish_battle_win(user_id, state):
         if "VÔ ĐỊCH" in extra_msg:
             record_mission_event(user_id, "cup_champ", 1)
 
+    drop_rate = 0.65 if "VÔ ĐỊCH" in extra_msg else (0.38 if mode == "cup" else (0.28 if mode == "trainer" else 0.14))
+    dropped_relic = roll_relic_drop(user_id, drop_chance=drop_rate)
+    if dropped_relic:
+        r_obj = dropped_relic["relic"]
+        if dropped_relic["is_new"]:
+            extra_msg += f" · 🎁 Rơi Relic [{r_obj['tier']}]: {r_obj['name']}!"
+        else:
+            extra_msg += f" · 🔮 Relic trùng {r_obj['name']} -> +{dropped_relic['dup_coins']} Coins!"
+
     state["rewards"] = {
         "coins": coins,
         "trainer_xp": xp,
         "pokemon_xp": poke_xp,
         "trainer": trainer_res,
         "extra": extra_msg,
+        "dropped_relic": dropped_relic,
     }
 
 
@@ -521,13 +531,18 @@ def perform_battle_action(user_id, battle_id, action, param=None):
             trainer_res = award_trainer_xp(user_id, int(45 * bonuses["xp_mult"]), coins_gain=int(35 * bonuses["coin_mult"]))
             record_mission_event(user_id, "catch", 1)
             record_mission_event(user_id, "battle_win", 1)
+            dropped_relic = roll_relic_drop(user_id, drop_chance=0.14)
             state["rewards"] = {
                 "caught_pokemon": added,
                 "coins": int(35 * bonuses["coin_mult"]),
                 "trainer_xp": int(45 * bonuses["xp_mult"]),
                 "trainer": trainer_res,
+                "dropped_relic": dropped_relic,
             }
             logs.append(f"✨ Đã bắt thành công {e['name']} (Lv.{e['level']})!")
+            if dropped_relic:
+                ro = dropped_relic["relic"]
+                logs.append(f"🎁 Quái đánh rơi Relic [{ro['tier']}]: {ro['name']}!" if dropped_relic["is_new"] else f"🔮 Relic trùng {ro['name']} (+{dropped_relic['dup_coins']} Coins)!")
         else:
             logs.append(f"{e['name']} đã phá vỡ {ball_key} sau {shakes} lần rung!")
             enemy_turn()

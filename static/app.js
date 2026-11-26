@@ -764,6 +764,52 @@ function openBattleState(state) {
   playCry(e.species_id);
 }
 
+const CLIENT_TYPE_CHART = {
+  normal: { rock: 0.5, ghost: 0.0, steel: 0.5 },
+  fire: { fire: 0.5, water: 0.5, grass: 2.0, ice: 2.0, bug: 2.0, rock: 0.5, dragon: 0.5, steel: 2.0 },
+  water: { fire: 2.0, water: 0.5, grass: 0.5, ground: 2.0, rock: 2.0, dragon: 0.5 },
+  electric: { water: 2.0, electric: 0.5, grass: 0.5, ground: 0.0, flying: 2.0, dragon: 0.5 },
+  grass: { fire: 0.5, water: 2.0, grass: 0.5, poison: 0.5, ground: 2.0, flying: 0.5, bug: 0.5, rock: 2.0, dragon: 0.5, steel: 0.5 },
+  ice: { fire: 0.5, water: 0.5, grass: 2.0, ice: 0.5, ground: 2.0, flying: 2.0, dragon: 2.0, steel: 0.5 },
+  fighting: { normal: 2.0, ice: 2.0, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2.0, ghost: 0.0, dark: 2.0, steel: 2.0, fairy: 0.5 },
+  poison: { grass: 2.0, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0.0, fairy: 2.0 },
+  ground: { fire: 2.0, electric: 2.0, grass: 0.5, poison: 2.0, flying: 0.0, bug: 0.5, rock: 2.0, steel: 2.0 },
+  flying: { electric: 0.5, grass: 2.0, fighting: 2.0, bug: 2.0, rock: 0.5, steel: 0.5 },
+  psychic: { fighting: 2.0, poison: 2.0, psychic: 0.5, dark: 0.0, steel: 0.5 },
+  bug: { fire: 0.5, grass: 2.0, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2.0, ghost: 0.5, dark: 2.0, steel: 0.5, fairy: 0.5 },
+  rock: { fire: 2.0, ice: 2.0, fighting: 0.5, ground: 0.5, flying: 2.0, bug: 2.0, steel: 0.5 },
+  ghost: { normal: 0.0, psychic: 2.0, ghost: 2.0, dark: 0.5 },
+  dragon: { dragon: 2.0, steel: 0.5, fairy: 0.0 },
+  dark: { fighting: 0.5, psychic: 2.0, ghost: 2.0, dark: 0.5, fairy: 0.5 },
+  steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2.0, rock: 2.0, steel: 0.5, fairy: 2.0 },
+  fairy: { fire: 0.5, fighting: 2.0, poison: 0.5, dragon: 2.0, dark: 2.0, steel: 0.5 },
+};
+
+function movePreviewMeta(attacker, defender, m) {
+  const chart = CLIENT_TYPE_CHART[m.type] || {};
+  let eff = 1.0;
+  for (const dt of defender?.types || []) eff *= chart[dt] ?? 1.0;
+  let badge = `<span style="color:#cbd5e1;">⚔️ ×1 Thường</span>`;
+  let effMult = 1.0;
+  if (eff === 0) {
+    badge = `<span style="color:#f87171;">🚫 Vô hiệu</span>`;
+    effMult = 0;
+  } else if (eff >= 4) {
+    badge = `<span style="color:#facc15;font-weight:800;">💥 ×4 KHẮC</span>`;
+    effMult = 3.6;
+  } else if (eff >= 2) {
+    badge = `<span style="color:#4ade80;font-weight:800;">🔥 ×2 KHẮC</span>`;
+    effMult = 2.15;
+  } else if (eff < 1) {
+    badge = `<span style="color:#93c5fd;">🛡️ ×${eff} Kháng</span>`;
+    effMult = eff >= 0.5 ? 0.55 : 0.3;
+  }
+  const stab = (attacker?.types || []).includes(m.type) ? 1.28 : 1.0;
+  const raw = (((2 * (attacker?.level || 1)) / 5 + 2) * (m.power || 50) * ((attacker?.atk || 10) / Math.max(1, defender?.def || 10))) / 42 + 2;
+  const est = eff === 0 ? 0 : Math.max(1, Math.round(raw * stab * effMult));
+  return { badge, est };
+}
+
 function renderBattle() {
   const s = currentBattle;
   if (!s) return;
@@ -811,52 +857,6 @@ function renderBattle() {
     .join("");
 
   const ongoing = s.status === "ongoing";
-
-const CLIENT_TYPE_CHART = {
-  normal: { rock: 0.5, ghost: 0.0, steel: 0.5 },
-  fire: { fire: 0.5, water: 0.5, grass: 2.0, ice: 2.0, bug: 2.0, rock: 0.5, dragon: 0.5, steel: 2.0 },
-  water: { fire: 2.0, water: 0.5, grass: 0.5, ground: 2.0, rock: 2.0, dragon: 0.5 },
-  electric: { water: 2.0, electric: 0.5, grass: 0.5, ground: 0.0, flying: 2.0, dragon: 0.5 },
-  grass: { fire: 0.5, water: 2.0, grass: 0.5, poison: 0.5, ground: 2.0, flying: 0.5, bug: 0.5, rock: 2.0, dragon: 0.5, steel: 0.5 },
-  ice: { fire: 0.5, water: 0.5, grass: 2.0, ice: 0.5, ground: 2.0, flying: 2.0, dragon: 2.0, steel: 0.5 },
-  fighting: { normal: 2.0, ice: 2.0, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2.0, ghost: 0.0, dark: 2.0, steel: 2.0, fairy: 0.5 },
-  poison: { grass: 2.0, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0.0, fairy: 2.0 },
-  ground: { fire: 2.0, electric: 2.0, grass: 0.5, poison: 2.0, flying: 0.0, bug: 0.5, rock: 2.0, steel: 2.0 },
-  flying: { electric: 0.5, grass: 2.0, fighting: 2.0, bug: 2.0, rock: 0.5, steel: 0.5 },
-  psychic: { fighting: 2.0, poison: 2.0, psychic: 0.5, dark: 0.0, steel: 0.5 },
-  bug: { fire: 0.5, grass: 2.0, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2.0, ghost: 0.5, dark: 2.0, steel: 0.5, fairy: 0.5 },
-  rock: { fire: 2.0, ice: 2.0, fighting: 0.5, ground: 0.5, flying: 2.0, bug: 2.0, steel: 0.5 },
-  ghost: { normal: 0.0, psychic: 2.0, ghost: 2.0, dark: 0.5 },
-  dragon: { dragon: 2.0, steel: 0.5, fairy: 0.0 },
-  dark: { fighting: 0.5, psychic: 2.0, ghost: 2.0, dark: 0.5, fairy: 0.5 },
-  steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2.0, rock: 2.0, steel: 0.5, fairy: 2.0 },
-  fairy: { fire: 0.5, fighting: 2.0, poison: 0.5, dragon: 2.0, dark: 2.0, steel: 0.5 },
-};
-
-function movePreviewMeta(attacker, defender, m) {
-  const chart = CLIENT_TYPE_CHART[m.type] || {};
-  let eff = 1.0;
-  for (const dt of defender?.types || []) eff *= chart[dt] ?? 1.0;
-  let badge = `<span style="color:#cbd5e1;">⚔️ ×1 Thường</span>`;
-  let effMult = 1.0;
-  if (eff === 0) {
-    badge = `<span style="color:#f87171;">🚫 Vô hiệu</span>`;
-    effMult = 0;
-  } else if (eff >= 4) {
-    badge = `<span style="color:#facc15;font-weight:800;">💥 ×4 KHẮC</span>`;
-    effMult = 3.6;
-  } else if (eff >= 2) {
-    badge = `<span style="color:#4ade80;font-weight:800;">🔥 ×2 KHẮC</span>`;
-    effMult = 2.15;
-  } else if (eff < 1) {
-    badge = `<span style="color:#93c5fd;">🛡️ ×${eff} Kháng</span>`;
-    effMult = eff >= 0.5 ? 0.55 : 0.3;
-  }
-  const stab = (attacker?.types || []).includes(m.type) ? 1.28 : 1.0;
-  const raw = (((2 * (attacker?.level || 1)) / 5 + 2) * (m.power || 50) * ((attacker?.atk || 10) / Math.max(1, defender?.def || 10))) / 42 + 2;
-  const est = eff === 0 ? 0 : Math.max(1, Math.round(raw * stab * effMult));
-  return { badge, est };
-}
 
   // Moves with live STAB, Khắc / Không khắc effectiveness & estimated damage!
   document.getElementById("battle-moves").innerHTML = p.moves
@@ -941,6 +941,19 @@ async function sendBattleAction(action, param = 0) {
     if (currentUser.level > prevLvl) {
       toast(`🎉 LÊN CẤP TRAINER Lv.${currentUser.level}! Nhận +1 Open Point để mở quốc gia mới!`, "success");
       loadWorld();
+    }
+    const relicDrop = data.state?.rewards?.dropped_relic;
+    if (relicDrop && relicDrop.relic) {
+      const rObj = relicDrop.relic;
+      if (window.PokeAudio && window.PokeAudio.playPackOpen) {
+        window.PokeAudio.playPackOpen();
+      }
+      if (relicDrop.is_new) {
+        toast(`🏺 RƠI RELIC MỚI [${rObj.tier}]: ${rObj.name}!`, "success");
+      } else {
+        toast(`🏺 Rơi Relic trùng [${rObj.tier}] ${rObj.name} → +${relicDrop.dup_coins} Coins!`, "info");
+      }
+      renderRelics();
     }
 
     const events = data.events || [];
@@ -1130,32 +1143,85 @@ async function pullGacha(mode) {
   }
 }
 
+let relicFilter = { tier: "all", own: "all" };
+
+function setRelicFilter(key, val) {
+  relicFilter[key] = val;
+  renderRelics();
+}
+
 function renderRelics() {
   if (!currentUser) return;
   const rels = currentUser.relics || [];
   const b = currentUser.relic_bonuses || {};
   const eqCnt = (b.equipped_ids || []).length;
+  const ownedCnt = rels.filter((r) => r.unlocked).length;
   document.getElementById("relic-bonus-summary").textContent =
-    `Đang kích hoạt: ${eqCnt}/3 · ATK +${Math.round(((b.atk_mult || 1) - 1) * 100)}% · DEF +${Math.round(((b.def_mult || 1) - 1) * 100)}% · SPD +${Math.round(((b.spd_mult || 1) - 1) * 100)}% · HP +${Math.round(((b.hp_mult || 1) - 1) * 100)}%`;
+    `Đã mở: ${ownedCnt}/${rels.length} · Trang bị: ${eqCnt}/3 · ATK +${Math.round(((b.atk_mult || 1) - 1) * 100)}% · DEF +${Math.round(((b.def_mult || 1) - 1) * 100)}% · SPD +${Math.round(((b.spd_mult || 1) - 1) * 100)}% · HP +${Math.round(((b.hp_mult || 1) - 1) * 100)}%`;
 
-  document.getElementById("relics-grid").innerHTML = rels
-    .map(
-      (r) => `
+  const tChips = document.getElementById("relic-tier-chips");
+  if (tChips) {
+    const tiers = ["all", "Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common"];
+    tChips.innerHTML = tiers
+      .map((t) => `<button type="button" class="pp-chip ${relicFilter.tier === t ? "active" : ""}" onclick="setRelicFilter('tier','${t}')">${t === "all" ? "Tất cả Tier" : t}</button>`)
+      .join("");
+  }
+  const oChips = document.getElementById("relic-own-chips");
+  if (oChips) {
+    const opts = [
+      ["all", "Tất cả"],
+      ["owned", "✅ Đã sở hữu"],
+      ["locked", "🔒 Chưa mở"],
+    ];
+    oChips.innerHTML = opts
+      .map(([k, lbl]) => `<button type="button" class="pp-chip ${relicFilter.own === k ? "active" : ""}" onclick="setRelicFilter('own','${k}')">${lbl}</button>`)
+      .join("");
+  }
+
+  const q = (document.getElementById("relic-search")?.value || "").trim().toLowerCase();
+  const tierRank = { Mythic: 0, Legendary: 1, Epic: 2, Rare: 3, Uncommon: 4, Common: 5 };
+  const filtered = rels
+    .filter((r) => {
+      if (relicFilter.tier !== "all" && (r.tier || "Rare") !== relicFilter.tier) return false;
+      if (relicFilter.own === "owned" && !r.unlocked) return false;
+      if (relicFilter.own === "locked" && r.unlocked) return false;
+      if (q && !r.name.toLowerCase().includes(q) && !r.stat_label.toLowerCase().includes(q)) return false;
+      return true;
+    })
+    .slice()
+    .sort((a, b2) => {
+      if (a.equipped !== b2.equipped) return a.equipped ? -1 : 1;
+      if (a.unlocked !== b2.unlocked) return a.unlocked ? -1 : 1;
+      return (tierRank[b2.tier] ?? 9) - (tierRank[a.tier] ?? 9) || a.price - b2.price;
+    });
+
+  const cntLbl = document.getElementById("relic-count-label");
+  if (cntLbl) cntLbl.textContent = `${filtered.length}/${rels.length} Relic`;
+
+  document.getElementById("relics-grid").innerHTML = filtered.length
+    ? filtered
+        .map(
+          (r) => `
       <div class="relic-card ${r.equipped ? "equipped" : ""}">
+        <div style="width:100%;display:flex;justify-content:space-between;align-items:center;">
+          ${tierBadgeHtml(r.tier || "Rare")}
+          <small class="muted">${r.equipped ? "⚡ Đang dùng" : r.unlocked ? "✅ Đã mở" : `🪙 ${r.price.toLocaleString()}`}</small>
+        </div>
         <div class="relic-stage" style="border-color:${r.color};">
-          <img class="relic-anim-${r.anim}" src="${r.icon}" alt="${r.name}" />
+          <img class="relic-anim-${r.anim}" style="filter:hue-rotate(${r.hue || 0}deg);" src="${r.icon}" alt="${r.name}" />
         </div>
         <strong style="color:${r.color};">${r.name}</strong>
         <span class="excl-badge">${r.stat_label}</span>
-        <p class="muted" style="margin:2px 0;font-size:0.84rem;">${r.desc}</p>
+        <p class="muted" style="margin:2px 0;font-size:0.82rem;">${r.desc}</p>
         ${
           r.unlocked
             ? `<button class="${r.equipped ? "btn-gold" : "btn-primary"} full-w" onclick="toggleEquipRelic('${r.id}')">${r.equipped ? "✅ Đang Trang Bị (Tháo)" : "⚡ Trang Bị Relic"}</button>`
-            : `<button class="btn-green full-w" onclick="buyRelic('${r.id}')"><img class="px-icon" src="/static/assets/ui/coin.svg" /> Mở Khóa · ${r.price}</button>`
+            : `<button class="btn-green full-w" onclick="buyRelic('${r.id}')"><img class="px-icon" src="/static/assets/ui/coin.svg" /> Mua Relic · ${r.price.toLocaleString()}</button>`
         }
       </div>`
-    )
-    .join("");
+        )
+        .join("")
+    : `<div class="muted">Không có Relic nào khớp bộ lọc.</div>`;
 }
 
 async function buyRelic(rid) {
