@@ -519,19 +519,50 @@ def api_pokemon_evolve(uid):
 def api_pokemon_candy(uid):
     data = request.get_json(silent=True) or {}
     poke_id = int(data.get("pokemon_id", 0))
+    amount_raw = data.get("amount", 1)
+
     conn = get_conn()
     prow = conn.execute(
         "SELECT level FROM user_pokemon WHERE id = ? AND user_id = ?", (poke_id, uid)
     ).fetchone()
+    inv_row = conn.execute(
+        "SELECT qty FROM inventory WHERE user_id = ? AND item_key = 'rare_candy'", (uid,)
+    ).fetchone()
     conn.close()
+
     if not prow:
         return jsonify({"error": "Không tìm thấy Pokémon."}), 404
-    if prow["level"] >= 100:
+    cur_lvl = prow["level"]
+    if cur_lvl >= 100:
         return jsonify({"error": "Pokémon đã đạt cấp tối đa (Lv.100)."}), 400
-    if not change_item_qty(uid, "rare_candy", -1):
+
+    have_candy = inv_row["qty"] if inv_row else 0
+    if have_candy <= 0:
         return jsonify({"error": "Bạn đã hết Rare Candy!"}), 400
-    updated = award_pokemon_xp(uid, poke_id, pokemon_xp_needed(prow["level"]))
-    return jsonify({"pokemon": updated, "user": get_user_profile(uid)})
+
+    levels_room = 100 - cur_lvl
+    if str(amount_raw).strip().lower() == "max":
+        use_qty = min(levels_room, have_candy)
+    else:
+        try:
+            req = max(1, min(100, int(amount_raw)))
+        except (TypeError, ValueError):
+            req = 1
+        use_qty = min(req, levels_room)
+        if have_candy < use_qty:
+            return jsonify({"error": f"Không đủ Rare Candy! Cần {use_qty} viên (hiện có {have_candy})."}), 400
+
+    if not change_item_qty(uid, "rare_candy", -use_qty):
+        return jsonify({"error": "Bạn đã hết Rare Candy!"}), 400
+
+    xp_total = sum(pokemon_xp_needed(l) for l in range(cur_lvl, cur_lvl + use_qty))
+    updated = award_pokemon_xp(uid, poke_id, xp_total)
+    return jsonify({
+        "pokemon": updated,
+        "used": use_qty,
+        "message": f"🍬 {updated['nickname']} tăng +{use_qty} cấp lên Lv.{updated['level']}!",
+        "user": get_user_profile(uid),
+    })
 
 
 @app.route("/api/pokemon/salvage", methods=["POST"])

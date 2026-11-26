@@ -1596,9 +1596,21 @@ function renderMyPokemon() {
     <div class="pp-insp-actions">
       <button class="btn-sm" onclick="quickAssign(${sel.id}, 3)">+Đội 3</button>
       <button class="btn-sm" onclick="quickAssign(${sel.id}, 6)">+Đội 6</button>
-      <button class="btn-sm btn-gold" onclick="feedCandy(${sel.id})"><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Candy</button>
-      ${sel.can_evolve ? `<button class="btn-sm btn-green" onclick="evolvePoke(${sel.id})">🧬 Tiến hóa</button>` : `<button class="btn-sm" disabled>BST ${sel.bst}</button>`}
-      <button class="btn-sm btn-danger" style="grid-column:span 2;" onclick="salvagePokemon(${sel.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "60 Coins"})</button>
+      <div style="grid-column:span 2;background:#19265c;border:1.5px solid #4861ad;border-radius:9px;padding:7px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;margin-bottom:5px;">
+          <span><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Tăng cấp (Rare Candy)</span>
+          <strong style="color:var(--gold);">Có: ${(currentUser.inventory && currentUser.inventory.rare_candy) || 0}</strong>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
+          <button class="btn-sm btn-gold" style="padding:4px 2px;" onclick="feedCandy(${sel.id}, 1)">+1</button>
+          <button class="btn-sm btn-gold" style="padding:4px 2px;" onclick="feedCandy(${sel.id}, 3)">+3</button>
+          <button class="btn-sm btn-gold" style="padding:4px 2px;" onclick="feedCandy(${sel.id}, 5)">+5</button>
+          <button class="btn-sm btn-gold" style="padding:4px 2px;" onclick="feedCandy(${sel.id}, 10)">+10</button>
+          <button class="btn-sm btn-green" style="padding:4px 2px;" onclick="feedCandy(${sel.id}, 'max')">MAX</button>
+        </div>
+      </div>
+      ${sel.can_evolve ? `<button class="btn-sm btn-green" style="grid-column:span 2;" onclick="evolvePoke(${sel.id})">🧬 Tiến hóa</button>` : `<button class="btn-sm" style="grid-column:span 2;" disabled>BST ${sel.bst}</button>`}
+      <button class="btn-sm btn-danger" style="grid-column:span 2;" onclick="salvagePokemon(${sel.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "25 Coins"})</button>
       ${dupCnt > 1 ? `<button class="btn-sm btn-gold" style="grid-column:span 2;" onclick="salvageKeepOneSpecies(${sel.species_id}, '${safeName}', ${dupCnt - 1})">♻️ Tách hết ${dupCnt - 1} con trùng (giữ 1)</button>` : ""}
     </div>`;
 }
@@ -1694,16 +1706,16 @@ async function assignTeamSlot(pokeId, modeSize, slot) {
   }
 }
 
-async function feedCandy(pokeId) {
+async function feedCandy(pokeId, amount = 1) {
   try {
     const data = await api("/api/pokemon/candy", {
       method: "POST",
-      body: JSON.stringify({ pokemon_id: pokeId }),
+      body: JSON.stringify({ pokemon_id: pokeId, amount }),
     });
     currentUser = data.user;
     updateHUD();
     renderTeamAndBag();
-    toast(`🍬 ${data.pokemon.nickname} đã tăng lên Lv.${data.pokemon.level}!`, "success");
+    toast(data.message || `🍬 ${data.pokemon.nickname} đã tăng lên Lv.${data.pokemon.level}!`, "success");
   } catch (err) {
     toast(err.message, "error");
   }
