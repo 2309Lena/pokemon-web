@@ -224,7 +224,7 @@ def open_booster_pack(user_id, pack_id):
         else:
             picked = random.choice(commons)
 
-        lvl = random.randint(6, 12) if (is_hit_slot or picked["legendary"]) else random.randint(4, 8)
+        lvl = 1
         added = add_pokemon_to_user(
             user_id,
             picked["id"],
@@ -419,7 +419,7 @@ def pull_gacha_banner(user_id, banner_id, pull_mode="x1"):
         if is_dup:
             coins_from_dupes += DUP_COINS_BY_TIER.get(tier, 35)
 
-        lvl = 10 if tier == "Legendary" else (7 if tier == "Epic" else 5)
+        lvl = 1
         added = add_pokemon_to_user(
             user_id,
             picked["id"],
@@ -443,7 +443,7 @@ def pull_gacha_banner(user_id, banner_id, pull_mode="x1"):
         egg_pick = random.choice(tiers["Epic"] + tiers["Legendary"])
         egg_shiny = random.random() < (shiny_prob * 3)
         egg_added = add_pokemon_to_user(
-            user_id, egg_pick["id"], level=12, is_shiny=egg_shiny, source=f"egg:{banner_id}", auto_assign=True
+            user_id, egg_pick["id"], level=1, is_shiny=egg_shiny, source=f"egg:{banner_id}", auto_assign=True
         )
         hatched_eggs.append(egg_added)
 
