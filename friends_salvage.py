@@ -12,8 +12,8 @@ SALVAGE_RATES = {
 }
 
 
-def salvage_pokemon_list(user_id, pokemon_ids=None, bulk_tier=None, keep_team=True):
-    """Dismantle selected Pokemon or non-team Pokemon of a given tier into Coins or Gacha Tickets."""
+def salvage_pokemon_list(user_id, pokemon_ids=None, bulk_tier=None, keep_team=True, species_id=None):
+    """Dismantle selected Pokemon, keep-1 duplicates for a single species, or non-team Pokemon of a tier."""
     conn = get_conn()
     all_rows = conn.execute(
         "SELECT id, species_id, level, is_shiny, team_slot_3, team_slot_6 FROM user_pokemon WHERE user_id = ?",
@@ -23,27 +23,44 @@ def salvage_pokemon_list(user_id, pokemon_ids=None, bulk_tier=None, keep_team=Tr
         conn.close()
         return None, "Bạn phải giữ lại ít nhất 1 Pokémon!"
 
+    def _keep_priority(r):
+        return (1 if (r["team_slot_3"] or r["team_slot_6"]) else 0, 1 if r["is_shiny"] else 0, r["level"], r["id"])
+
     targets = []
-    if pokemon_ids:
+    if species_id is not None:
+        sid = int(species_id)
+        matching = sorted([r for r in all_rows if r["species_id"] == sid], key=_keep_priority, reverse=True)
+        if len(matching) <= 1:
+            conn.close()
+            return None, "Loài này chỉ còn 1 con duy nhất trong túi!"
+        # Keep index 0 (team > shiny > highest level), salvage remaining copies of this species
+        for r in matching[1:]:
+            if keep_team and (r["team_slot_3"] or r["team_slot_6"]):
+                continue
+            targets.append(r)
+        if not targets:
+            conn.close()
+            return None, "Các bản sao còn lại đang nằm trong đội hình nên được giữ an toàn!"
+    elif pokemon_ids:
         want = {int(pid) for pid in pokemon_ids}
         targets = [r for r in all_rows if r["id"] in want]
         if not targets:
             conn.close()
             return None, "Không tìm thấy Pokémon để tách."
     elif bulk_tier:
+        ordered = sorted(all_rows, key=_keep_priority, reverse=True)
         seen_species = set()
-        for r in all_rows:
+        for r in ordered:
             sp = POKEMON_BY_ID.get(r["species_id"], POKEMON_BY_ID[25])
             t = sp.get("tier", "Common")
             if bulk_tier == "duplicates":
-                # Keep highest level or team Pokemon, salvage duplicate lower ones (excluding Shiny)
-                if r["is_shiny"] or (keep_team and (r["team_slot_3"] or r["team_slot_6"])):
+                # Keep best 1 copy per species, salvage extra duplicates (protect team copies)
+                if r["species_id"] not in seen_species:
                     seen_species.add(r["species_id"])
                     continue
-                if r["species_id"] in seen_species:
-                    targets.append(r)
-                else:
-                    seen_species.add(r["species_id"])
+                if keep_team and (r["team_slot_3"] or r["team_slot_6"]):
+                    continue
+                targets.append(r)
             elif t == bulk_tier:
                 if keep_team and (r["team_slot_3"] or r["team_slot_6"]):
                     continue
@@ -52,7 +69,7 @@ def salvage_pokemon_list(user_id, pokemon_ids=None, bulk_tier=None, keep_team=Tr
                 targets.append(r)
         if not targets:
             conn.close()
-            return None, "Không có Pokémon nào phù hợp (đã bỏ qua Pokémon trong đội hình & Shiny)."
+            return None, "Không có Pokémon nào phù hợp để tách."
     else:
         conn.close()
         return None, "Chưa chọn Pokémon để tách."

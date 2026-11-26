@@ -349,15 +349,52 @@
 
         <div id="team-bag-view">
           <div class="filter-bar">
-            <input id="bag-search" type="text" placeholder="Tìm Pokémon của bạn..." oninput="renderMyPokemon()" />
+            <input id="bag-search" type="text" placeholder="Tìm tên hoặc #ID..." oninput="renderMyPokemon()" />
             <select id="bag-tier-filter" onchange="renderMyPokemon()">
-              <option value="all">Tất cả Tier (Common → Mythic)</option>
+              <option value="all">Rarity: Tất cả</option>
               <option value="Mythic">Mythic (Thần Thoại)</option>
               <option value="Legendary">Legendary (Huyền Thoại)</option>
               <option value="Epic">Epic (Sử Thi / Pseudo)</option>
               <option value="Rare">Rare (Hiếm)</option>
               <option value="Uncommon">Uncommon (Khá Phổ Biến)</option>
               <option value="Common">Common (Đại Trà)</option>
+            </select>
+            <select id="bag-type-filter" onchange="renderMyPokemon()">
+              <option value="all">Hệ: Tất cả</option>
+              <option value="fire">Fire (Lửa)</option>
+              <option value="water">Water (Nước)</option>
+              <option value="grass">Grass (Cỏ)</option>
+              <option value="electric">Electric (Điện)</option>
+              <option value="ice">Ice (Băng)</option>
+              <option value="fighting">Fighting (Giác Đấu)</option>
+              <option value="poison">Poison (Độc)</option>
+              <option value="ground">Ground (Đất)</option>
+              <option value="flying">Flying (Bay)</option>
+              <option value="psychic">Psychic (Tâm Linh)</option>
+              <option value="bug">Bug (Bọ)</option>
+              <option value="rock">Rock (Đá)</option>
+              <option value="ghost">Ghost (Ma)</option>
+              <option value="dragon">Dragon (Rồng)</option>
+              <option value="dark">Dark (Bóng Tối)</option>
+              <option value="steel">Steel (Thép)</option>
+              <option value="fairy">Fairy (Tiên)</option>
+              <option value="normal">Normal (Thường)</option>
+            </select>
+            <select id="bag-dps-filter" onchange="renderMyPokemon()">
+              <option value="0">DPS: Tất cả</option>
+              <option value="15">DPS ≥ 15</option>
+              <option value="30">DPS ≥ 30</option>
+              <option value="60">DPS ≥ 60</option>
+              <option value="100">DPS ≥ 100</option>
+              <option value="150">DPS ≥ 150</option>
+            </select>
+            <select id="bag-sort-filter" onchange="renderMyPokemon()">
+              <option value="tier">Sắp xếp: Rarity (Mythic → Common)</option>
+              <option value="dps_desc">Sắp xếp: DPS Cao → Thấp</option>
+              <option value="dps_asc">Sắp xếp: DPS Thấp → Cao</option>
+              <option value="lvl_desc">Sắp xếp: Level Cao → Thấp</option>
+              <option value="atk_desc">Sắp xếp: ATK Cao → Thấp</option>
+              <option value="bst_desc">Sắp xếp: BST Cao → Thấp</option>
             </select>
           </div>
           <div class="bulk-salvage-bar">
@@ -367,6 +404,7 @@
               <span>Common <b>60 Coins</b> · Uncommon <b>120 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
             </div>
             <div class="bulk-salvage-actions">
+              <button class="btn-sm btn-gold" onclick="bulkSalvageTier('duplicates')">♻️ Tách hết trùng (mỗi loài giữ 1)</button>
               <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Common')">Tách hết Common</button>
               <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Uncommon')">Tách hết Uncommon</button>
               <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Rare')">Tách hết Rare</button>
@@ -400,6 +438,31 @@
               <option value="7">Gen 7 (Alola)</option>
               <option value="8">Gen 8 (Galar/Hisui)</option>
               <option value="9">Gen 9 (Paldea)</option>
+            </select>
+            <select id="dex-type-filter" onchange="renderPokedex()">
+              <option value="all">Hệ: Tất cả</option>
+              <option value="fire">Fire</option>
+              <option value="water">Water</option>
+              <option value="grass">Grass</option>
+              <option value="electric">Electric</option>
+              <option value="ice">Ice</option>
+              <option value="fighting">Fighting</option>
+              <option value="poison">Poison</option>
+              <option value="ground">Ground</option>
+              <option value="flying">Flying</option>
+              <option value="psychic">Psychic</option>
+              <option value="bug">Bug</option>
+              <option value="rock">Rock</option>
+              <option value="ghost">Ghost</option>
+              <option value="dragon">Dragon</option>
+              <option value="dark">Dark</option>
+              <option value="steel">Steel</option>
+              <option value="fairy">Fairy</option>
+              <option value="normal">Normal</option>
+            </select>
+            <select id="dex-sort-filter" onchange="renderPokedex()">
+              <option value="id">Sắp xếp: #ID</option>
+              <option value="bst_desc">Sắp xếp: BST / Sức mạnh giảm dần</option>
             </select>
             <label class="chk-inline"><input type="checkbox" id="dex-excl-only" onchange="renderPokedex()" /> Chỉ hiện Pokémon Độc Quyền Quốc Gia</label>
           </div>

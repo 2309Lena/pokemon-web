@@ -1174,7 +1174,7 @@ async function loadPacksAndShop() {
           <p style="font-size:0.82rem; color:#e2e8f0; margin:0;">${pk.subtitle}</p>
         </div>
         <img class="cover" src="${spriteUrl(pk.cover_id)}" alt="${pk.name}" />
-        <button class="btn-gold full-w" onclick="openPack('${pk.id}')">🃏 Mở Pack · 🪙 ${pk.price}</button>
+        <button class="btn-gold full-w" onclick="openPack('${pk.id}')">🃏 Mở Pack · 🪙 ${pk.price.toLocaleString()}</button>
       </div>`
     )
     .join("");
@@ -1196,9 +1196,13 @@ async function loadPacksAndShop() {
             <strong>${it.name}</strong>
           </div>
           <p class="muted" style="margin:4px 0;">${it.desc}</p>
-          <small>Trong túi: <strong>${owned}</strong></small>
+          <small>Trong túi: <strong>${owned}</strong> · Đơn giá: <strong>${it.price.toLocaleString()}</strong> Coins</small>
         </div>
-        <button class="btn-primary" onclick="buyShopItem('${it.key}')"><img class="px-icon" src="/static/assets/ui/coin.svg" /> Mua 1 · ${it.price}</button>
+        <div class="mart-buy-row" style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-primary btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 1)">Mua ×1</button>
+          <button class="btn-gold btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 10)">×10 (${(it.price * 10).toLocaleString()})</button>
+          <button class="btn-green btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 100)">×100 (${(it.price * 100).toLocaleString()})</button>
+        </div>
       </div>`;
     })
     .join("");
@@ -1247,11 +1251,11 @@ async function openPack(packId) {
   }
 }
 
-async function buyShopItem(key) {
+async function buyShopItem(key, qty = 1) {
   try {
     const data = await api("/api/shop/buy", {
       method: "POST",
-      body: JSON.stringify({ item_key: key, qty: 1 }),
+      body: JSON.stringify({ item_key: key, qty }),
     });
     currentUser = data.user;
     updateHUD();
@@ -1329,39 +1333,89 @@ const SALVAGE_LABEL = {
   Mythic: "3 Vé Tím",
 };
 
+function calcPokeDps(p) {
+  const atk = p?.stats?.atk || 10;
+  const spd = p?.stats?.spd || 10;
+  return Math.round(atk * (1 + spd / 100));
+}
+
 function renderMyPokemon() {
   if (!currentUser) return;
-  const q = (document.getElementById("bag-search")?.value || "").toLowerCase();
+  const q = (document.getElementById("bag-search")?.value || "").trim().toLowerCase();
   const tierF = document.getElementById("bag-tier-filter")?.value || "all";
+  const typeF = document.getElementById("bag-type-filter")?.value || "all";
+  const minDps = Number(document.getElementById("bag-dps-filter")?.value || 0);
+  const sortMode = document.getElementById("bag-sort-filter")?.value || "tier";
   const tierRank = { Mythic: 0, Legendary: 1, Epic: 2, Rare: 3, Uncommon: 4, Common: 5 };
+
+  const speciesCounts = {};
+  for (const p of currentUser.pokemon) {
+    speciesCounts[p.species_id] = (speciesCounts[p.species_id] || 0) + 1;
+  }
+
   const list = currentUser.pokemon
-    .filter((p) => (tierF === "all" || (p.tier || "Common") === tierF) && p.species_name.toLowerCase().includes(q))
+    .filter((p) => {
+      if (tierF !== "all" && (p.tier || "Common") !== tierF) return false;
+      if (typeF !== "all" && !(p.types || []).includes(typeF)) return false;
+      if (minDps > 0 && calcPokeDps(p) < minDps) return false;
+      if (q && !p.species_name.toLowerCase().includes(q) && String(p.species_id) !== q) return false;
+      return true;
+    })
     .slice()
-    .sort((a, b) => (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) || b.level - a.level);
-  document.getElementById("my-pokemon-grid").innerHTML = list
-    .map((p) => {
-      const tier = p.tier || "Common";
-      const safeName = (p.nickname || p.species_name || "").replace(/'/g, "\\'");
-      return `
+    .sort((a, b) => {
+      if (sortMode === "dps_desc") return calcPokeDps(b) - calcPokeDps(a) || b.level - a.level;
+      if (sortMode === "dps_asc") return calcPokeDps(a) - calcPokeDps(b) || a.level - b.level;
+      if (sortMode === "lvl_desc") return b.level - a.level || calcPokeDps(b) - calcPokeDps(a);
+      if (sortMode === "atk_desc") return (b.stats?.atk || 0) - (a.stats?.atk || 0);
+      if (sortMode === "bst_desc") return (b.bst || 0) - (a.bst || 0);
+      return (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) || calcPokeDps(b) - calcPokeDps(a);
+    });
+
+  document.getElementById("my-pokemon-grid").innerHTML = list.length
+    ? list
+        .map((p) => {
+          const tier = p.tier || "Common";
+          const dps = calcPokeDps(p);
+          const dupCnt = speciesCounts[p.species_id] || 1;
+          const safeName = (p.nickname || p.species_name || "").replace(/'/g, "\\'");
+          return `
       <div class="poke-card">
         <div class="poke-card-top">
           <span>#${p.species_id} · Lv.${p.level}</span>
           ${tierBadgeHtml(tier)}
         </div>
         ${pokeImgTag(p.species_id, p.is_shiny, "poke-idle-anim")}
-        <strong>${p.is_shiny ? "✨ " : ""}${p.nickname}</strong>
+        <strong>${p.is_shiny ? "✨ " : ""}${p.nickname} ${dupCnt > 1 ? `<small class="muted">(×${dupCnt})</small>` : ""}</strong>
         <div class="type-row">${typeBadgesHtml(p.types)}</div>
-        <small class="muted">BST ${p.bst || "?"} · HP ${p.stats.max_hp} · ATK ${p.stats.atk} · SPD ${p.stats.spd}</small>
+        <small class="muted">⚡ DPS <strong>${dps}</strong> · BST ${p.bst || "?"} · HP ${p.stats.max_hp} · ATK ${p.stats.atk} · SPD ${p.stats.spd}</small>
         <div class="slot-actions">
           <button class="btn-sm" onclick="quickAssign(${p.id}, 3)">+Đội 3</button>
           <button class="btn-sm" onclick="quickAssign(${p.id}, 6)">+Đội 6</button>
           <button class="btn-sm btn-gold" onclick="feedCandy(${p.id})"><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Candy</button>
           ${p.can_evolve ? `<button class="btn-sm btn-green" onclick="evolvePoke(${p.id})">🧬 Tiến hóa</button>` : ""}
           <button class="btn-sm btn-danger" onclick="salvagePokemon(${p.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "60 Coins"})</button>
+          ${dupCnt > 1 ? `<button class="btn-sm btn-gold" onclick="salvageKeepOneSpecies(${p.species_id}, '${safeName}', ${dupCnt - 1})">♻️ Tách hết (giữ 1)</button>` : ""}
         </div>
       </div>`;
-    })
-    .join("");
+        })
+        .join("")
+    : `<div class="muted">Không có Pokémon nào khớp bộ lọc.</div>`;
+}
+
+async function salvageKeepOneSpecies(speciesId, name, extraCount) {
+  if (!confirm(`Tách toàn bộ ${extraCount} bản sao trùng của ${name} và giữ lại ĐÚNG 1 con mạnh nhất?`)) return;
+  try {
+    const data = await api("/api/pokemon/salvage", {
+      method: "POST",
+      body: JSON.stringify({ species_id: speciesId, keep_team: true }),
+    });
+    currentUser = data.user;
+    updateHUD();
+    renderTeamAndBag();
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 async function salvagePokemon(pokeId, name, tier) {
@@ -1471,6 +1525,8 @@ function renderPokedex() {
   const q = (document.getElementById("dex-search")?.value || "").toLowerCase();
   const tierF = document.getElementById("dex-tier-filter")?.value || "all";
   const gen = document.getElementById("dex-gen-filter")?.value || "all";
+  const typeF = document.getElementById("dex-type-filter")?.value || "all";
+  const sortMode = document.getElementById("dex-sort-filter")?.value || "id";
   const exclOnly = document.getElementById("dex-excl-only")?.checked || false;
   const caughtSet = new Set(currentUser?.pokedex?.caught_ids || []);
 
@@ -1478,10 +1534,12 @@ function renderPokedex() {
     .filter((s) => {
       if (tierF !== "all" && (s.tier || "Common") !== tierF) return false;
       if (gen !== "all" && String(s.gen) !== gen) return false;
+      if (typeF !== "all" && !(s.types || []).includes(typeF)) return false;
       if (exclOnly && !s.exclusive_country_name) return false;
       if (q && !s.name.toLowerCase().includes(q) && String(s.id) !== q) return false;
       return true;
     })
+    .sort((a, b) => (sortMode === "bst_desc" ? (b.bst || 0) - (a.bst || 0) : a.id - b.id))
     .slice(0, 80);
 
   document.getElementById("pokedex-grid").innerHTML = filtered
