@@ -101,6 +101,30 @@ function toast(msg, kind = "info") {
   setTimeout(() => el.remove(), 2600);
 }
 
+function askConfirm(message, title = "⚠️ Xác Nhận Thao Tác", okLabel = "✓ Xác Nhận") {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("custom-confirm-modal");
+    const tEl = document.getElementById("confirm-modal-title");
+    const mEl = document.getElementById("confirm-modal-msg");
+    const okBtn = document.getElementById("confirm-modal-ok");
+    const cancelBtn = document.getElementById("confirm-modal-cancel");
+    if (!modal || !okBtn || !cancelBtn) return resolve(true);
+    tEl.textContent = title;
+    mEl.textContent = message;
+    okBtn.textContent = okLabel;
+    modal.classList.remove("hidden");
+
+    const cleanup = (ans) => {
+      modal.classList.add("hidden");
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(ans);
+    };
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+  });
+}
+
 async function api(url, opts = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -1580,7 +1604,12 @@ function renderMyPokemon() {
 }
 
 async function salvageKeepOneSpecies(speciesId, name, extraCount) {
-  if (!confirm(`Tách toàn bộ ${extraCount} bản sao trùng của ${name} và giữ lại ĐÚNG 1 con mạnh nhất?`)) return;
+  const ok = await askConfirm(
+    `Tách toàn bộ ${extraCount} bản sao trùng của ${name} và giữ lại ĐÚNG 1 con mạnh nhất?`,
+    "♻️ Tách Hết Bản Sao (Giữ 1)",
+    "♻️ Tách & Giữ 1"
+  );
+  if (!ok) return;
   try {
     const data = await api("/api/pokemon/salvage", {
       method: "POST",
@@ -1597,7 +1626,12 @@ async function salvageKeepOneSpecies(speciesId, name, extraCount) {
 
 async function salvagePokemon(pokeId, name, tier) {
   const rewardText = SALVAGE_LABEL[tier] || "Coins";
-  if (!confirm(`Tách ${name} (${tier}) để nhận ${rewardText}? Pokémon bị tách sẽ biến mất vĩnh viễn!`)) return;
+  const ok = await askConfirm(
+    `Tách ${name} (${tier}) để nhận ${rewardText}? Pokémon bị tách sẽ biến mất vĩnh viễn!`,
+    "✂️ Tách Pokémon",
+    `✂️ Tách (+${rewardText})`
+  );
+  if (!ok) return;
   try {
     const data = await api("/api/pokemon/salvage", {
       method: "POST",
@@ -1613,7 +1647,13 @@ async function salvagePokemon(pokeId, name, tier) {
 }
 
 async function bulkSalvageTier(tier) {
-  if (!confirm(`Tách TẤT CẢ Pokémon bậc ${tier} (tự giữ lại Pokémon trong đội hình 3v3/6v6 và Pokémon Shiny)?`)) return;
+  const label = tier === "duplicates" ? "toàn bộ bản sao trùng (mỗi loài giữ 1)" : `TẤT CẢ Pokémon bậc ${tier}`;
+  const ok = await askConfirm(
+    `Tách ${label} (tự giữ lại Pokémon trong đội hình 3v3/6v6 và Pokémon Shiny)?`,
+    "✂️ Tách Hàng Loạt",
+    "✂️ Xác Nhận Tách"
+  );
+  if (!ok) return;
   try {
     const data = await api("/api/pokemon/salvage", {
       method: "POST",
@@ -2512,7 +2552,7 @@ async function respondFriend(requestId, action) {
 }
 
 async function removeFriend(friendId, username) {
-  if (!confirm(`Hủy kết bạn với ${username}?`)) return;
+  if (!(await askConfirm(`Hủy kết bạn với ${username}?`, "👋 Hủy Kết Bạn", "Hủy Kết Bạn"))) return;
   try {
     const data = await api("/api/friends/remove", {
       method: "POST",
@@ -2770,7 +2810,7 @@ async function submitForumReply(e, postId) {
 }
 
 async function deleteForumPost(postId) {
-  if (!confirm("Xóa bài viết góp ý này?")) return;
+  if (!(await askConfirm("Xóa bài viết góp ý này?", "🗑️ Xóa Bài Viết", "🗑️ Xóa"))) return;
   try {
     const data = await api(`/api/forum/posts/${postId}`, { method: "DELETE" });
     const filtered = forumCategoryFilter === "all" ? data.posts : (data.posts || []).filter((p) => p.category === forumCategoryFilter);

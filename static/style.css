@@ -797,3 +797,12 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
   animation: pulseReady 1.2s ease-in-out infinite;
 }
 @keyframes pulseReady { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+.confirm-game-card {
+  background: linear-gradient(165deg, #1d2d73 0%, #101942 100%);
+  border: 3px solid var(--gold); border-radius: 14px; text-align: center;
+  box-shadow: 0 0 36px rgba(250, 204, 21, 0.35), 0 22px 54px rgba(0, 0, 0, 0.85);
+  animation: centerPop 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+.confirm-game-title { font-size: 1.15rem; font-weight: 800; color: var(--gold); margin-bottom: 10px; }
+.confirm-game-msg { color: #e2e8f0; margin: 0 0 18px; line-height: 1.45; font-size: 0.96rem; }

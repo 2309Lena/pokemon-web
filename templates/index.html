@@ -610,6 +610,18 @@
     </div>
   </div>
 
+  <!-- CENTERED CUSTOM GAME CONFIRM POPUP (Replaces ugly browser confirm) -->
+  <div id="custom-confirm-modal" class="modal-backdrop hidden" style="z-index:9600;">
+    <div class="modal-card confirm-game-card">
+      <div class="confirm-game-title" id="confirm-modal-title">⚠️ Xác Nhận</div>
+      <p id="confirm-modal-msg" class="confirm-game-msg"></p>
+      <div class="solo-actions-row">
+        <button type="button" id="confirm-modal-cancel" class="btn-sm" style="padding:10px 14px;">✕ Huỷ</button>
+        <button type="button" id="confirm-modal-ok" class="btn-gold btn-sm" style="padding:10px 14px;">✓ Xác Nhận</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/vfx.js?v={{ asset_v }}"></script>
   <script src="/static/app.js?v={{ asset_v }}"></script>
 </body>
