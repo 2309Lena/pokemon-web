@@ -176,10 +176,26 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .cont-chip { font-size: 0.78rem; padding: 5px 10px; border-radius: 999px; background: #0e1729; border: 1px solid var(--border); }
 .cont-chip.active { background: var(--blue); color: #081226; border-color: var(--blue); }
 .map-svg-wrap {
+  position: relative;
   background: radial-gradient(circle at center, #0e2442 0%, #071224 100%);
   border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  touch-action: none; user-select: none;
 }
-#world-svg { width: 100%; height: auto; display: block; }
+#world-svg { width: 100%; height: auto; display: block; cursor: grab; touch-action: none; }
+#world-svg.dragging { cursor: grabbing; }
+.map-zoom-controls {
+  position: absolute; top: 10px; right: 10px; z-index: 10;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(11, 17, 32, 0.88); border: 2px solid var(--border);
+  border-radius: 10px; padding: 5px 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.45);
+}
+.map-zoom-controls button { min-width: 34px; height: 32px; padding: 0 8px; font-size: 1rem; font-weight: 800; }
+.zoom-badge { font-size: 0.78rem; color: var(--gold); font-weight: 700; min-width: 34px; text-align: center; }
+.map-mobile-hint {
+  position: absolute; left: 10px; bottom: 8px; z-index: 9; pointer-events: none;
+  background: rgba(8, 13, 25, 0.78); color: var(--muted); border-radius: 6px;
+  padding: 3px 8px; font-size: 0.74rem;
+}
 .country-path {
   fill: #24324d; stroke: #0a1220; stroke-width: 0.65; cursor: pointer;
   transition: fill 0.15s, stroke 0.15s;

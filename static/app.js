@@ -281,7 +281,174 @@ async function claimDaily() {
 }
 
 // ---------------- WORLD MAP ----------------
+const WORLD_VB = { x: 0, y: 0, w: 1000, h: 500 };
+let worldDidDrag = false;
+
+const CONTINENT_VIEWS = {
+  ALL: { x: 0, y: 0, w: 1000, h: 500 },
+  Asia: { x: 525, y: 80, w: 460, h: 230 },
+  Europe: { x: 435, y: 45, w: 230, h: 115 },
+  Africa: { x: 350, y: 135, w: 450, h: 225 },
+  "North America": { x: 50, y: 25, w: 420, h: 210 },
+  "South America": { x: 165, y: 205, w: 410, h: 205 },
+  Oceania: { x: 705, y: 235, w: 295, h: 147.5 },
+  Antarctica: { x: 80, y: 390, w: 840, h: 110 },
+};
+
+function applyWorldViewBox() {
+  const svg = document.getElementById("world-svg");
+  if (!svg) return;
+  WORLD_VB.w = Math.max(125, Math.min(1000, WORLD_VB.w));
+  WORLD_VB.h = WORLD_VB.w * 0.5;
+  WORLD_VB.x = Math.max(0, Math.min(1000 - WORLD_VB.w, WORLD_VB.x));
+  WORLD_VB.y = Math.max(0, Math.min(500 - WORLD_VB.h, WORLD_VB.y));
+  svg.setAttribute("viewBox", `${WORLD_VB.x.toFixed(2)} ${WORLD_VB.y.toFixed(2)} ${WORLD_VB.w.toFixed(2)} ${WORLD_VB.h.toFixed(2)}`);
+  const zoomRatio = 1000 / WORLD_VB.w;
+  const badge = document.getElementById("world-zoom-badge");
+  if (badge) badge.textContent = `${zoomRatio.toFixed(1)}x`;
+  // Keep country outlines crisp cleanly scaled when zooming close on tiny nations!
+  const sw = Math.max(0.18, 0.65 / Math.sqrt(zoomRatio));
+  svg.querySelectorAll(".country-path").forEach((p) => {
+    p.style.strokeWidth = p.classList.contains("selected") ? `${sw * 2.4}` : `${sw}`;
+  });
+}
+
+function zoomWorldMap(factor, anchorClientX = null, anchorClientY = null) {
+  const svg = document.getElementById("world-svg");
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  let rx = 0.5;
+  let ry = 0.5;
+  if (anchorClientX !== null && anchorClientY !== null && rect.width > 0 && rect.height > 0) {
+    rx = Math.max(0, Math.min(1, (anchorClientX - rect.left) / rect.width));
+    ry = Math.max(0, Math.min(1, (anchorClientY - rect.top) / rect.height));
+  }
+  const newW = Math.max(125, Math.min(1000, WORLD_VB.w / factor));
+  const newH = newW * 0.5;
+  WORLD_VB.x += (WORLD_VB.w - newW) * rx;
+  WORLD_VB.y += (WORLD_VB.h - newH) * ry;
+  WORLD_VB.w = newW;
+  WORLD_VB.h = newH;
+  applyWorldViewBox();
+}
+
+function resetWorldZoom() {
+  Object.assign(WORLD_VB, CONTINENT_VIEWS.ALL);
+  applyWorldViewBox();
+}
+
+function initWorldZoomHandlers() {
+  const wrap = document.getElementById("world-map-wrap");
+  const svg = document.getElementById("world-svg");
+  if (!wrap || !svg || wrap.dataset.zoomBound) return;
+  wrap.dataset.zoomBound = "1";
+
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let startVbX = 0;
+  let startVbY = 0;
+  let pinchDist = 0;
+
+  wrap.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.25 : 0.8;
+    zoomWorldMap(factor, e.clientX, e.clientY);
+  }, { passive: false });
+
+  svg.addEventListener("dblclick", (e) => {
+    zoomWorldMap(1.8, e.clientX, e.clientY);
+  });
+
+  // Mouse pan & drag detection
+  svg.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    worldDidDrag = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    startVbX = WORLD_VB.x;
+    startVbY = WORLD_VB.y;
+    svg.classList.add("dragging");
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > 5) worldDidDrag = true;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      WORLD_VB.x = startVbX - (dx / rect.width) * WORLD_VB.w;
+      WORLD_VB.y = startVbY - (dy / rect.height) * WORLD_VB.h;
+      applyWorldViewBox();
+    }
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    svg.classList.remove("dragging");
+    setTimeout(() => { worldDidDrag = false; }, 30);
+  });
+
+  // Mobile 1-finger pan + 2-finger pinch-to-zoom
+  svg.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      dragging = true;
+      worldDidDrag = false;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startVbX = WORLD_VB.x;
+      startVbY = WORLD_VB.y;
+    } else if (e.touches.length === 2) {
+      dragging = false;
+      worldDidDrag = true;
+      pinchDist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY
+      );
+    }
+  }, { passive: true });
+
+  svg.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 1 && dragging) {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.hypot(dx, dy) > 6) {
+        worldDidDrag = true;
+        e.preventDefault();
+        const rect = svg.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          WORLD_VB.x = startVbX - (dx / rect.width) * WORLD_VB.w;
+          WORLD_VB.y = startVbY - (dy / rect.height) * WORLD_VB.h;
+          applyWorldViewBox();
+        }
+      }
+    } else if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[1].clientX - e.touches[0].clientX,
+        e.touches[1].clientY - e.touches[0].clientY
+      );
+      if (pinchDist > 10 && dist > 10) {
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) * 0.5;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) * 0.5;
+        zoomWorldMap(dist / pinchDist, midX, midY);
+      }
+      pinchDist = dist;
+    }
+  }, { passive: false });
+
+  svg.addEventListener("touchend", () => {
+    dragging = false;
+    pinchDist = 0;
+    setTimeout(() => { worldDidDrag = false; }, 60);
+  });
+}
+
 async function loadWorld() {
+  initWorldZoomHandlers();
   const data = await api("/api/world");
   worldCountries = data.countries;
   if (!selectedCountryId) {
@@ -290,6 +457,7 @@ async function loadWorld() {
   }
   renderContinentFilters();
   renderWorldSVG();
+  applyWorldViewBox();
   if (selectedCountryId) {
     selectCountry(selectedCountryId, false);
     if (!currentExplore) enterCountryExplore(selectedCountryId, false);
@@ -307,8 +475,13 @@ function renderContinentFilters() {
 
 function setContinentFilter(cont) {
   activeContinentFilter = cont;
+  if (CONTINENT_VIEWS[cont]) {
+    Object.assign(WORLD_VB, CONTINENT_VIEWS[cont]);
+    WORLD_VB.h = WORLD_VB.w * 0.5;
+  }
   renderContinentFilters();
   renderWorldSVG();
+  applyWorldViewBox();
 }
 
 function renderWorldSVG() {
@@ -327,9 +500,11 @@ function renderWorldSVG() {
       return `<path class="${cls}" data-id="${c.id}" d="${c.svg_path}" onclick="selectCountry('${c.id}')"><title>${c.name} (${c.continent})</title></path>`;
     })
     .join("");
+  applyWorldViewBox();
 }
 
 function selectCountry(cid, redrawSvg = true) {
+  if (worldDidDrag && redrawSvg) return;
   selectedCountryId = cid;
   if (redrawSvg) renderWorldSVG();
   const c = worldCountries.find((x) => x.id === cid);
