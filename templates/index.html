@@ -90,6 +90,7 @@
       <button class="nav-btn" data-tab="team" onclick="switchTab('team')"><img class="px-icon" src="/static/assets/ui/bag.svg" alt="" /> Đội Hình & Dex</button>
       <button class="nav-btn" data-tab="online" onclick="switchTab('online')"><img class="px-icon" src="/static/assets/ui/online.svg" alt="" /> Online PvP</button>
       <button class="nav-btn" data-tab="friends" onclick="switchTab('friends')"><img class="px-icon" src="/static/assets/ui/friends.svg" alt="" /> Bạn Bè <span id="friends-badge" class="notif-dot hidden">!</span></button>
+      <button class="nav-btn" data-tab="forum" onclick="switchTab('forum')"><img class="px-icon" src="/static/assets/ui/forum.svg" alt="" /> Forum</button>
     </nav>
 
     <main class="main-content">
@@ -507,6 +508,34 @@
             <h3>🤝 Bạn bè của bạn <span id="friends-accepted-count" class="badge">0</span></h3>
             <div id="friends-list" class="friends-list"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- 11. DEV FEEDBACK FORUM TAB -->
+      <section id="panel-forum" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <h2><img class="px-icon" src="/static/assets/ui/forum.svg" alt="" /> Forum Góp Ý Cho Dev</h2>
+            <p class="muted">Nơi người chơi viết đề xuất tính năng mới, báo lỗi hoặc thảo luận cân bằng game trực tiếp cho Dev đọc.</p>
+          </div>
+          <div class="pp-chip-row" id="forum-filter-chips"></div>
+        </div>
+
+        <div class="forum-layout">
+          <form class="forum-composer" onsubmit="submitForumPost(event)">
+            <h3>✍️ Viết Góp Ý Mới</h3>
+            <select id="forum-cat-input" class="pp-select">
+              <option value="suggestion">💡 Góp Ý Tính Năng</option>
+              <option value="bug">🐛 Báo Lỗi / Bug</option>
+              <option value="balance">⚖️ Cân Bằng Game</option>
+              <option value="chat">💬 Thảo Luận Chung</option>
+            </select>
+            <input id="forum-title-input" class="pp-search-input" type="text" maxlength="100" placeholder="Tiêu đề ngắn gọn (vd: Thêm Mega Evolution...)" required />
+            <textarea id="forum-content-input" class="forum-textarea" rows="5" maxlength="1500" placeholder="Mô tả chi tiết ý tưởng hoặc lỗi bạn gặp để Dev đọc và cập nhật..." required></textarea>
+            <button type="submit" class="btn-gold full-w">📨 Gửi Góp Ý Lên Forum</button>
+          </form>
+
+          <div id="forum-posts-list" class="forum-posts-list"></div>
         </div>
       </section>
     </main>

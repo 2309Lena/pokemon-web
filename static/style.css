@@ -689,3 +689,40 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .pp-stat-fill { height: 100%; border-radius: 999px; transition: width 0.25s; }
 .pp-stat-val { text-align: right; font-weight: 700; }
 .pp-insp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+
+/* Dev Feedback Forum */
+.forum-layout { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 960px) { .forum-layout { grid-template-columns: 1fr; } }
+.forum-composer {
+  background: #142052; border: 2px solid #4861ad; border-radius: 12px; padding: 16px;
+  display: flex; flex-direction: column; gap: 10px; position: sticky; top: 14px;
+}
+.forum-composer h3 { margin: 0 0 2px; }
+.forum-textarea {
+  background: #141f4f; border: 2px solid #465ea8; color: #fff; padding: 10px 12px;
+  border-radius: 9px; font-family: inherit; font-size: 0.92rem; resize: vertical;
+}
+.forum-posts-list { display: flex; flex-direction: column; gap: 12px; }
+.forum-post-card {
+  background: #142052; border: 2px solid #425aa6; border-radius: 12px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.forum-post-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.forum-cat-badge {
+  font-size: 0.74rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #263b8a; border: 1px solid #647cc4;
+}
+.forum-post-title { font-size: 1.08rem; font-weight: 800; color: var(--gold); margin: 2px 0; }
+.forum-post-body { color: #e2e8f0; white-space: pre-wrap; line-height: 1.45; font-size: 0.92rem; }
+.forum-post-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.forum-like-btn.liked { border-color: var(--gold); color: var(--gold); background: #263b8a; }
+.forum-replies {
+  border-top: 1px dashed #3c549e; padding-top: 8px; margin-top: 4px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.forum-reply-item {
+  background: #0e173b; border: 1px solid #2e4285; border-radius: 8px; padding: 6px 10px; font-size: 0.85rem;
+}
+.forum-reply-form { display: flex; gap: 6px; margin-top: 4px; }
+.forum-reply-form input {
+  flex: 1; background: #0d1424; border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 7px; font-family: inherit;
+}

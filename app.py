@@ -6,6 +6,7 @@ import hmac
 import os
 import secrets
 import subprocess
+import time
 from functools import wraps
 
 from flask import Flask, jsonify, render_template, request, session
@@ -602,6 +603,160 @@ def api_friends_remove(uid):
     friend_id = int(data.get("friend_id", 0))
     remove_friend(uid, friend_id)
     return jsonify({"message": "Đã hủy kết bạn.", "overview": get_friends_overview(uid)})
+
+
+def _fetch_forum_posts(uid, category="all"):
+    conn = get_conn()
+    params = []
+    where = ""
+    if category and category != "all":
+        where = "WHERE fp.category = ?"
+        params.append(category)
+    rows = conn.execute(
+        f"""
+        SELECT fp.id, fp.user_id, fp.category, fp.title, fp.content, fp.dev_status, fp.created_at,
+               u.username, u.level,
+               (SELECT COUNT(*) FROM forum_likes fl WHERE fl.post_id = fp.id) as likes_count,
+               (SELECT 1 FROM forum_likes fl2 WHERE fl2.post_id = fp.id AND fl2.user_id = ?) as liked_by_me
+        FROM forum_posts fp
+        JOIN users u ON u.id = fp.user_id
+        {where}
+        ORDER BY fp.id DESC
+        LIMIT 80
+        """,
+        [uid, *params],
+    ).fetchall()
+
+    post_ids = [r["id"] for r in rows]
+    replies_by_post = {pid: [] for pid in post_ids}
+    if post_ids:
+        ph = ",".join("?" for _ in post_ids)
+        rep_rows = conn.execute(
+            f"""
+            SELECT fr.id, fr.post_id, fr.user_id, fr.content, fr.created_at, u.username, u.level
+            FROM forum_replies fr
+            JOIN users u ON u.id = fr.user_id
+            WHERE fr.post_id IN ({ph})
+            ORDER BY fr.id ASC
+            """,
+            post_ids,
+        ).fetchall()
+        for rr in rep_rows:
+            replies_by_post[rr["post_id"]].append(
+                {
+                    "id": rr["id"],
+                    "username": rr["username"],
+                    "level": rr["level"],
+                    "content": rr["content"],
+                    "created_at": rr["created_at"],
+                }
+            )
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "category": r["category"],
+            "title": r["title"],
+            "content": r["content"],
+            "dev_status": r["dev_status"],
+            "created_at": r["created_at"],
+            "username": r["username"],
+            "level": r["level"],
+            "likes_count": r["likes_count"],
+            "liked_by_me": bool(r["liked_by_me"]),
+            "is_mine": r["user_id"] == uid,
+            "replies": replies_by_post.get(r["id"], []),
+        }
+        for r in rows
+    ]
+
+
+@app.route("/api/forum/posts", methods=["GET"])
+@login_required
+def api_forum_list(uid):
+    cat = request.args.get("category", "all")
+    return jsonify({"posts": _fetch_forum_posts(uid, cat)})
+
+
+@app.route("/api/forum/posts", methods=["POST"])
+@login_required
+def api_forum_create(uid):
+    data = request.get_json(silent=True) or {}
+    category = (data.get("category") or "suggestion").strip()
+    if category not in ("suggestion", "bug", "balance", "chat"):
+        category = "suggestion"
+    title = (data.get("title") or "").strip()[:100]
+    content = (data.get("content") or "").strip()[:1500]
+    if len(title) < 3:
+        return jsonify({"error": "Tiêu đề phải có ít nhất 3 ký tự."}), 400
+    if len(content) < 5:
+        return jsonify({"error": "Nội dung góp ý phải có ít nhất 5 ký tự."}), 400
+
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO forum_posts (user_id, category, title, content, created_at) VALUES (?, ?, ?, ?, ?)",
+        (uid, category, title, content, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Đã gửi góp ý lên Forum cho Dev đọc!", "posts": _fetch_forum_posts(uid)})
+
+
+@app.route("/api/forum/posts/<int:post_id>/like", methods=["POST"])
+@login_required
+def api_forum_like(uid, post_id):
+    conn = get_conn()
+    exists = conn.execute("SELECT 1 FROM forum_posts WHERE id = ?", (post_id,)).fetchone()
+    if not exists:
+        conn.close()
+        return jsonify({"error": "Bài viết không tồn tại."}), 404
+    liked = conn.execute("SELECT 1 FROM forum_likes WHERE post_id = ? AND user_id = ?", (post_id, uid)).fetchone()
+    if liked:
+        conn.execute("DELETE FROM forum_likes WHERE post_id = ? AND user_id = ?", (post_id, uid))
+    else:
+        conn.execute("INSERT INTO forum_likes (post_id, user_id) VALUES (?, ?)", (post_id, uid))
+    conn.commit()
+    conn.close()
+    return jsonify({"posts": _fetch_forum_posts(uid)})
+
+
+@app.route("/api/forum/posts/<int:post_id>/reply", methods=["POST"])
+@login_required
+def api_forum_reply(uid, post_id):
+    data = request.get_json(silent=True) or {}
+    content = (data.get("content") or "").strip()[:800]
+    if len(content) < 2:
+        return jsonify({"error": "Bình luận quá ngắn."}), 400
+    conn = get_conn()
+    exists = conn.execute("SELECT 1 FROM forum_posts WHERE id = ?", (post_id,)).fetchone()
+    if not exists:
+        conn.close()
+        return jsonify({"error": "Bài viết không tồn tại."}), 404
+    conn.execute(
+        "INSERT INTO forum_replies (post_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+        (post_id, uid, content, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Đã bình luận!", "posts": _fetch_forum_posts(uid)})
+
+
+@app.route("/api/forum/posts/<int:post_id>", methods=["DELETE"])
+@login_required
+def api_forum_delete(uid, post_id):
+    conn = get_conn()
+    row = conn.execute("SELECT user_id FROM forum_posts WHERE id = ?", (post_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Bài viết không tồn tại."}), 404
+    if row["user_id"] != uid:
+        conn.close()
+        return jsonify({"error": "Bạn chỉ có thể xóa bài viết của chính mình."}), 403
+    conn.execute("DELETE FROM forum_posts WHERE id = ?", (post_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Đã xóa bài viết.", "posts": _fetch_forum_posts(uid)})
 
 
 @app.route("/api/online/rooms")

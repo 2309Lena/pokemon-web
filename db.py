@@ -179,6 +179,35 @@ def init_db():
             FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (addressee_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS forum_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL DEFAULT 'suggestion',
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            dev_status TEXT NOT NULL DEFAULT 'open',
+            created_at REAL NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS forum_likes (
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            PRIMARY KEY (post_id, user_id),
+            FOREIGN KEY (post_id) REFERENCES forum_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS forum_replies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY (post_id) REFERENCES forum_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
     # Safe migration for existing SQLite databases missing new columns

@@ -262,6 +262,7 @@ function switchTab(tab) {
   document.getElementById(`panel-${tab}`).classList.add("active");
   if (tab === "online") refreshOnlineRooms();
   if (tab === "friends") loadFriends();
+  if (tab === "forum") loadForumPosts();
   if (tab === "team") renderTeamAndBag();
   if (tab === "cup") loadCups();
   if (tab === "packs") renderGachaView();
@@ -2237,6 +2238,158 @@ async function inviteFriendRoom(friendName, mode) {
     renderOnlineRoomStage();
     refreshOnlineRooms();
     toast(`Đã tạo phòng ${mode === "trade" ? "Trade" : "PvP"}! Mã phòng cho ${friendName}: ${data.room.code}`, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+// ---------------- DEV FEEDBACK FORUM ----------------
+let forumCategoryFilter = "all";
+const FORUM_CAT_LABELS = {
+  suggestion: "💡 Góp Ý",
+  bug: "🐛 Báo Lỗi",
+  balance: "⚖️ Cân Bằng",
+  chat: "💬 Thảo Luận",
+};
+
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function setForumCategory(cat) {
+  forumCategoryFilter = cat;
+  loadForumPosts();
+}
+
+async function loadForumPosts() {
+  const chipsEl = document.getElementById("forum-filter-chips");
+  if (chipsEl) {
+    const cats = [
+      ["all", "Tất cả"],
+      ["suggestion", "💡 Góp Ý"],
+      ["bug", "🐛 Báo Lỗi"],
+      ["balance", "⚖️ Cân Bằng"],
+      ["chat", "💬 Thảo Luận"],
+    ];
+    chipsEl.innerHTML = cats
+      .map(([k, lbl]) => `<button type="button" class="pp-chip ${forumCategoryFilter === k ? "active" : ""}" onclick="setForumCategory('${k}')">${lbl}</button>`)
+      .join("");
+  }
+  try {
+    const data = await api(`/api/forum/posts?category=${encodeURIComponent(forumCategoryFilter)}`);
+    renderForumPosts(data.posts || []);
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+function renderForumPosts(posts) {
+  const el = document.getElementById("forum-posts-list");
+  if (!el) return;
+  if (!posts.length) {
+    el.innerHTML = `<div class="forum-post-card"><div class="muted">Chưa có bài viết nào trong mục này. Hãy là người đầu tiên góp ý cho Dev!</div></div>`;
+    return;
+  }
+  el.innerHTML = posts
+    .map((p) => {
+      const dt = new Date((p.created_at || 0) * 1000).toLocaleString("vi-VN");
+      const catLabel = FORUM_CAT_LABELS[p.category] || p.category;
+      const repHtml = (p.replies || [])
+        .map(
+          (r) => `
+          <div class="forum-reply-item">
+            <strong>${escapeHtml(r.username)}</strong> <small class="muted">Lv.${r.level}</small>: ${escapeHtml(r.content)}
+          </div>`
+        )
+        .join("");
+      return `
+      <div class="forum-post-card">
+        <div class="forum-post-head">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="forum-cat-badge">${catLabel}</span>
+            <strong>${escapeHtml(p.username)}</strong>
+            <small class="badge">Lv.${p.level}</small>
+          </div>
+          <small class="muted">${dt}</small>
+        </div>
+        <div class="forum-post-title">${escapeHtml(p.title)}</div>
+        <div class="forum-post-body">${escapeHtml(p.content)}</div>
+        <div class="forum-post-actions">
+          <button type="button" class="btn-sm forum-like-btn ${p.liked_by_me ? "liked" : ""}" onclick="toggleForumLike(${p.id})">👍 Ủng hộ (${p.likes_count})</button>
+          <span class="muted">💬 ${(p.replies || []).length} bình luận</span>
+          ${p.is_mine ? `<button type="button" class="btn-sm btn-danger" onclick="deleteForumPost(${p.id})">🗑️ Xóa</button>` : ""}
+        </div>
+        <div class="forum-replies">
+          ${repHtml}
+          <form class="forum-reply-form" onsubmit="submitForumReply(event, ${p.id})">
+            <input id="reply-input-${p.id}" type="text" maxlength="800" placeholder="Viết bình luận..." required />
+            <button type="submit" class="btn-sm btn-primary">Gửi</button>
+          </form>
+        </div>
+      </div>`;
+    })
+    .join("");
+}
+
+async function submitForumPost(e) {
+  e.preventDefault();
+  const category = document.getElementById("forum-cat-input").value;
+  const titleEl = document.getElementById("forum-title-input");
+  const contentEl = document.getElementById("forum-content-input");
+  try {
+    const data = await api("/api/forum/posts", {
+      method: "POST",
+      body: JSON.stringify({ category, title: titleEl.value, content: contentEl.value }),
+    });
+    titleEl.value = "";
+    contentEl.value = "";
+    renderForumPosts(data.posts || []);
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function toggleForumLike(postId) {
+  try {
+    const data = await api(`/api/forum/posts/${postId}/like`, { method: "POST" });
+    const filtered = forumCategoryFilter === "all" ? data.posts : (data.posts || []).filter((p) => p.category === forumCategoryFilter);
+    renderForumPosts(filtered);
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function submitForumReply(e, postId) {
+  e.preventDefault();
+  const inp = document.getElementById(`reply-input-${postId}`);
+  const content = (inp?.value || "").trim();
+  if (!content) return;
+  try {
+    const data = await api(`/api/forum/posts/${postId}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    if (inp) inp.value = "";
+    const filtered = forumCategoryFilter === "all" ? data.posts : (data.posts || []).filter((p) => p.category === forumCategoryFilter);
+    renderForumPosts(filtered);
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function deleteForumPost(postId) {
+  if (!confirm("Xóa bài viết góp ý này?")) return;
+  try {
+    const data = await api(`/api/forum/posts/${postId}`, { method: "DELETE" });
+    const filtered = forumCategoryFilter === "all" ? data.posts : (data.posts || []).filter((p) => p.category === forumCategoryFilter);
+    renderForumPosts(filtered);
+    toast(data.message, "info");
   } catch (err) {
     toast(err.message, "error");
   }
