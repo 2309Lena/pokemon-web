@@ -465,7 +465,7 @@ function movePlayer(dx, dy) {
     return;
   }
   const tile = m.grid[ny][nx];
-  if (tile === 2 || tile === 5) {
+  if ([2, 5, 12, 13, 14, 16, 17, 18].includes(tile)) {
     window.RPGRenderer.moveTo(playerPos.x, playerPos.y, dir);
     return;
   }
@@ -481,6 +481,7 @@ function movePlayer(dx, dy) {
     toast(`📍 Bạn đã bước vào ${newZone.name} (${newZone.weather_label})!`, "info");
   }
 
+  const hitPoke = (m.overworld_pokemon || []).find((op) => op.x === nx && op.y === ny);
   if (tile === 3) {
     window.PokeAudio.playCatchSuccess();
     toast("💖 Đội hình của bạn đã được nghỉ ngơi tại Trạm PokéCenter!", "success");
@@ -488,6 +489,11 @@ function movePlayer(dx, dy) {
     toast(`🪧 Biển chỉ dẫn: Chào mừng đến ${newZone.name} (${newZone.weather_label})!`, "info");
   } else if (tile === 4) {
     startCountryTrainer();
+  } else if (tile === 15) {
+    toast("🕳️ Bạn bước vào Hang Động Bí Ẩn — Pokémon hiếm xuất hiện!", "info");
+    triggerExploreEncounter(true);
+  } else if (hitPoke) {
+    triggerExploreEncounter(false);
   } else if (tile === 1 && Math.random() < 0.34) {
     triggerExploreEncounter(false);
   }

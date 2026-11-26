@@ -423,6 +423,8 @@ class RPGRenderer {
   constructor(canvasId) {
     this.canvasId = canvasId;
     this.sprites = {};
+    this.pokeSprites = {};
+    this.tileAtlas = {};
     this.loaded = false;
     this.mapData = null;
     this.playerX = 7;
@@ -434,6 +436,7 @@ class RPGRenderer {
     this.weather = [];
     this.loopStarted = false;
     this.preload();
+    this._buildPixelAtlas();
   }
 
   preload() {
@@ -463,14 +466,168 @@ class RPGRenderer {
     }
   }
 
+  _pxCanvas(w, h, drawFn) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    drawFn(g);
+    return c;
+  }
+
+  _buildPixelAtlas() {
+    // 1. Nintendo DS Gen-4/5 Layered Emerald Canopy Tree (24x32 native pixel grid -> drawn crisp 48x64)
+    this.tileAtlas.nintendo_tree = this._pxCanvas(24, 32, (g) => {
+      // Trunk
+      g.fillStyle = "#452310";
+      g.fillRect(9, 23, 6, 8);
+      g.fillStyle = "#7c431f";
+      g.fillRect(10, 23, 4, 7);
+      g.fillStyle = "#9c592d";
+      g.fillRect(11, 24, 1, 5);
+      // Lower shadow foliage skirt
+      const tiers = [
+        { y: 15, rx: 10, ry: 6, dark: "#174b1e", mid: "#2d7e2b", hi: "#4eb43c", top: "#78e051" },
+        { y: 9, rx: 8, ry: 5, dark: "#1b5922", mid: "#369432", hi: "#5dc747", top: "#8cf062" },
+        { y: 4, rx: 5, ry: 4, dark: "#1e6625", mid: "#45ab3d", hi: "#74da58", top: "#a6f77b" },
+      ];
+      for (const tr of tiers) {
+        for (let dy = -tr.ry; dy <= tr.ry; dy++) {
+          for (let dx = -tr.rx; dx <= tr.rx; dx++) {
+            const d = (dx * dx) / (tr.rx * tr.rx) + (dy * dy) / (tr.ry * tr.ry);
+            if (d > 1.0) continue;
+            const px = 12 + dx;
+            const py = tr.y + dy;
+            if (d > 0.78 || dy === tr.ry) g.fillStyle = tr.dark;
+            else if (dy > 1) g.fillStyle = tr.mid;
+            else if (dy > -2) g.fillStyle = tr.hi;
+            else g.fillStyle = tr.top;
+            g.fillRect(px, py, 1, 1);
+          }
+        }
+      }
+      // Crisp pixel dither highlights
+      g.fillStyle = "#c4fca0";
+      g.fillRect(10, 2, 2, 1);
+      g.fillRect(8, 7, 2, 1);
+      g.fillRect(14, 12, 2, 1);
+    });
+
+    // 2. Tall Wild Grass Clump (20x20 crisp layered DS blades)
+    this.tileAtlas.tall_grass = this._pxCanvas(20, 20, (g) => {
+      g.fillStyle = "#185923";
+      g.fillRect(2, 13, 16, 5);
+      const blades = [3, 6, 9, 12, 15];
+      for (const bx of blades) {
+        g.fillStyle = "#165220";
+        g.fillRect(bx, 6, 2, 11);
+        g.fillStyle = "#298c35";
+        g.fillRect(bx, 5, 2, 8);
+        g.fillStyle = "#5ad454";
+        g.fillRect(bx, 4, 1, 5);
+        g.fillStyle = "#9cf57a";
+        g.fillRect(bx, 3, 1, 2);
+      }
+      g.fillStyle = "#34a13f";
+      g.fillRect(4, 11, 12, 4);
+      g.fillStyle = "#6ee663";
+      g.fillRect(5, 9, 2, 3);
+      g.fillRect(11, 8, 2, 3);
+      g.fillRect(14, 10, 2, 2);
+    });
+
+    // 3. Conical-Roof Park Gazebo (26x32 native pixel grid)
+    this.tileAtlas.gazebo = this._pxCanvas(26, 32, (g) => {
+      // Raised stone floor & steps
+      g.fillStyle = "#64748b";
+      g.fillRect(1, 22, 24, 9);
+      g.fillStyle = "#cbd5e1";
+      g.fillRect(2, 21, 22, 7);
+      g.fillStyle = "#e2e8f0";
+      g.fillRect(3, 22, 20, 4);
+      // Red park bench trim
+      g.fillStyle = "#b91c1c";
+      g.fillRect(5, 25, 6, 2);
+      g.fillRect(15, 25, 6, 2);
+      // Timber pillars
+      g.fillStyle = "#451a03";
+      g.fillRect(4, 13, 2, 10);
+      g.fillRect(20, 13, 2, 10);
+      g.fillRect(12, 14, 2, 7);
+      // Conical tiled gray slate roof
+      for (let ry = 0; ry < 12; ry++) {
+        const w = Math.min(24, 2 + ry * 2);
+        const rx = 13 - Math.floor(w / 2);
+        g.fillStyle = ry < 3 ? "#cbd5e1" : ry < 7 ? "#94a3b8" : "#64748b";
+        g.fillRect(rx, 4 + ry, w, 1);
+        g.fillStyle = "#334155";
+        g.fillRect(rx, 4 + ry, 1, 1);
+        g.fillRect(rx + w - 1, 4 + ry, 1, 1);
+      }
+      g.fillStyle = "#334155";
+      g.fillRect(1, 15, 24, 2);
+      // Spire finial
+      g.fillStyle = "#475569";
+      g.fillRect(12, 1, 2, 3);
+      g.fillStyle = "#f1f5f9";
+      g.fillRect(12, 1, 1, 1);
+    });
+
+    // 4. Mossy Fallen Log / Stump (20x20)
+    this.tileAtlas.log = this._pxCanvas(20, 20, (g) => {
+      g.fillStyle = "#3e1f0d";
+      g.fillRect(2, 9, 16, 8);
+      g.fillStyle = "#784421";
+      g.fillRect(3, 10, 13, 6);
+      g.fillStyle = "#9a5b30";
+      g.fillRect(4, 10, 10, 2);
+      // Cut end rings
+      g.fillStyle = "#eab364";
+      g.fillRect(15, 10, 3, 6);
+      g.fillStyle = "#b87a3d";
+      g.fillRect(16, 12, 1, 2);
+      // Moss patches
+      g.fillStyle = "#4ade80";
+      g.fillRect(5, 9, 4, 2);
+      g.fillRect(10, 11, 3, 1);
+    });
+
+    // 5. Park Streetlamp & Bench (20x26)
+    this.tileAtlas.lamp = this._pxCanvas(20, 26, (g) => {
+      // Base pedestal
+      g.fillStyle = "#1e293b";
+      g.fillRect(8, 20, 4, 5);
+      g.fillStyle = "#334155";
+      g.fillRect(9, 7, 2, 14);
+      // Lantern head + warm light
+      g.fillStyle = "#0f172a";
+      g.fillRect(7, 2, 6, 6);
+      g.fillStyle = "#fde047";
+      g.fillRect(8, 4, 4, 3);
+      g.fillStyle = "#fef9c3";
+      g.fillRect(9, 4, 2, 2);
+      g.fillStyle = "#475569";
+      g.fillRect(8, 1, 4, 1);
+    });
+  }
+
+  _getPokeMini(speciesId) {
+    if (this.pokeSprites[speciesId]) return this.pokeSprites[speciesId];
+    const img = new Image();
+    img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${speciesId}.png`;
+    this.pokeSprites[speciesId] = img;
+    return img;
+  }
+
   setMap(mapData, spawn) {
     this.mapData = mapData;
     this.playerX = spawn.x;
     this.playerY = spawn.y;
     this.targetX = spawn.x;
     this.targetY = spawn.y;
-    this.camX = Math.max(0, spawn.x * 44 - 400);
-    this.camY = Math.max(0, spawn.y * 44 - 280);
+    this.camX = Math.max(0, spawn.x * 40 - 400);
+    this.camY = Math.max(0, spawn.y * 40 - 280);
     this.dir = "down";
     this.initWeather();
     this.startLoop();
@@ -485,27 +642,48 @@ class RPGRenderer {
 
   initWeather() {
     this.weather = [];
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < 42; i++) {
       this.weather.push({
         x: Math.random() * 800,
         y: Math.random() * 560,
-        speed: 1 + Math.random() * 2.5,
-        r: 1.5 + Math.random() * 2.2,
+        speed: 1 + Math.random() * 2.2,
+        r: 1.5 + Math.random() * 2.0,
         phase: Math.random() * Math.PI * 2,
       });
     }
   }
 
+  _isRoadLike(t) {
+    return t === 7 || t === 9 || t === 11;
+  }
+
+  _isWaterLike(t) {
+    return t === 5 || t === 18;
+  }
+
+  _grassColors(weather, biome) {
+    if (weather === "snow" || biome === "glacier" || biome === "taiga") {
+      return { base: "#92cde6", tuft: "#6db4d4", light: "#cfeefa", cliffA: "#58728c", cliffB: "#3e556e", cliffTop: "#d6f2ff" };
+    }
+    if (weather === "sandstorm" || biome === "desert") {
+      return { base: "#d6b064", tuft: "#bc9348", light: "#ebd08d", cliffA: "#a36a39", cliffB: "#7a4a22", cliffTop: "#dfc077" };
+    }
+    if (weather === "mist") {
+      return { base: "#4ea85f", tuft: "#3c8b4e", light: "#6ec477", cliffA: "#7b5a44", cliffB: "#5a3d2b", cliffTop: "#64be6e" };
+    }
+    if (weather === "rain") {
+      return { base: "#4cb551", tuft: "#3b9840", light: "#6fd16d", cliffA: "#8a5a36", cliffB: "#633c20", cliffTop: "#63cc61" };
+    }
+    // Signature Nintendo DS Spring/Emerald HGSS palette matching screenshot!
+    return { base: "#62c74f", tuft: "#48aa3b", light: "#82df6b", cliffA: "#9b6438", cliffB: "#744522", cliffTop: "#75d95c" };
+  }
+
   obstacleKeyForZone(weather, biome) {
-    if (weather === "snow") return "pine_snow";
-    if (weather === "sandstorm") return "cactus_desert";
-    if (weather === "storm") return "rock_mountain";
-    if (weather === "rain") return biome === "coast" ? "palm_coast" : "tree_forest";
-    if (biome === "desert") return "cactus_desert";
-    if (biome === "glacier" || biome === "taiga") return "pine_snow";
+    if (weather === "snow" || biome === "glacier" || biome === "taiga") return "pine_snow";
+    if (weather === "sandstorm" || biome === "desert") return "cactus_desert";
+    if (weather === "storm" || biome === "mountain") return "rock_mountain";
     if (biome === "coast" || biome === "savanna") return "palm_coast";
-    if (biome === "mountain") return "rock_mountain";
-    return "tree_forest";
+    return "nintendo_tree";
   }
 
   startLoop() {
@@ -527,9 +705,11 @@ class RPGRenderer {
     ctx.imageSmoothingEnabled = false;
 
     const m = this.mapData;
-    const TILE = 44;
+    const TILE = 40;
     const worldW = m.width * TILE;
     const worldH = m.height * TILE;
+    const elevAt = (x, y) => (m.elev_grid && m.elev_grid[y]?.[x] !== undefined ? m.elev_grid[y][x] : 0);
+    const tileAt = (x, y) => (y >= 0 && y < m.height && x >= 0 && x < m.width ? m.grid[y][x] : 2);
 
     // Smooth walk interpolation
     const dx = this.targetX - this.playerX;
@@ -538,7 +718,6 @@ class RPGRenderer {
     this.playerX = moving ? this.playerX + dx * 0.30 : this.targetX;
     this.playerY = moving ? this.playerY + dy * 0.30 : this.targetY;
 
-    // Nintendo-style smooth scrolling camera centered on Player Trainer
     const goalCamX = Math.max(0, Math.min(worldW - canvas.width, (this.playerX + 0.5) * TILE - canvas.width / 2));
     const goalCamY = Math.max(0, Math.min(worldH - canvas.height, (this.playerY + 0.5) * TILE - canvas.height / 2));
     this.camX = this.camX === undefined ? goalCamX : this.camX + (goalCamX - this.camX) * 0.18;
@@ -556,85 +735,241 @@ class RPGRenderer {
     const curZIdx = m.zone_grid ? (m.zone_grid[curTy]?.[curTx] ?? 0) : 0;
     const curZone = m.zones?.[curZIdx] || { name: "Region", weather: "sunny", weather_label: "☀️ Nắng Ấm" };
 
-    // 1. Ground tiles inside visible camera viewport
+    // PASS 1: Crisp Terrain, Auto-Tiled Roads, Layered Water & Waterfalls, Terraced Cliffs & Stairs
     for (let y = minRow; y <= maxRow; y++) {
       for (let x = minCol; x <= maxCol; x++) {
         const px = Math.floor(x * TILE - this.camX);
         const py = Math.floor(y * TILE - this.camY);
         const tile = m.grid[y][x];
         const zIdx = m.zone_grid ? (m.zone_grid[y]?.[x] ?? 0) : 0;
-        const zone = m.zones?.[zIdx] || { groundA: m.palette.tileA, groundB: m.palette.tileB, weather: "sunny" };
+        const zone = m.zones?.[zIdx] || { weather: "sunny" };
+        const pal = this._grassColors(zone.weather, m.biome);
+        const el = elevAt(x, y);
+        const elUp = elevAt(x, y - 1);
 
-        if (tile === 5) {
-          const wave = Math.sin(t * 2.2 + x * 0.65 + y * 0.5);
-          ctx.fillStyle = wave > 0.25 ? "#1b5e96" : wave < -0.35 ? "#12426e" : "#164f82";
-          ctx.fillRect(px, py, TILE, TILE);
-          const shift = Math.floor((t * 10 + y * 7) % (TILE - 10));
-          ctx.fillStyle = "rgba(186, 230, 253, 0.55)";
-          ctx.fillRect(px + shift, py + 12, 10, 3);
-          ctx.fillRect(px + ((shift + 18) % (TILE - 8)), py + 28, 7, 2);
-          if (y > 0 && m.grid[y - 1][x] !== 5) {
-            ctx.fillStyle = "rgba(224, 242, 254, 0.72)";
-            ctx.fillRect(px, py, TILE, 4);
+        // Water & Animated Cascading Waterfalls
+        if (this._isWaterLike(tile) || tile === 9) {
+          const isFall = y > 0 && this._isWaterLike(tileAt(x, y - 1)) && elUp > el && tile !== 9;
+          if (isFall) {
+            // Cascading white/blue Nintendo DS waterfall!
+            ctx.fillStyle = "#2d7ec2";
+            ctx.fillRect(px, py, TILE, TILE);
+            const flow = Math.floor(t * 28) % TILE;
+            for (let sx = 3; sx < TILE - 4; sx += 7) {
+              ctx.fillStyle = "#bae6fd";
+              ctx.fillRect(px + sx, py + flow, 4, 14);
+              ctx.fillRect(px + sx, py + ((flow + 20) % TILE), 4, 12);
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(px + sx + 1, py + ((flow + 4) % TILE), 2, 8);
+            }
+            // Top lip & bottom churning splash foam
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(px, py, TILE, 5);
+            const splash = Math.sin(t * 9 + x) * 2;
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.fillRect(px + 2, py + TILE - 8 + splash * 0.4, TILE - 4, 6);
+          } else {
+            // Stepped DS River Shading + Animated Ripples
+            ctx.fillStyle = "#3688c9";
+            ctx.fillRect(px, py, TILE, TILE);
+            ctx.fillStyle = "#489ce0";
+            ctx.fillRect(px, py + 4, TILE, TILE - 8);
+            const shift = Math.floor((t * 14 + x * 11 + y * 5) % (TILE - 12));
+            ctx.fillStyle = "rgba(186, 230, 253, 0.55)";
+            ctx.fillRect(px + shift, py + 11, 10, 2);
+            ctx.fillRect(px + ((shift + 17) % (TILE - 10)), py + 27, 8, 2);
+            // Shoreline banks & foam rims
+            if (!this._isWaterLike(tileAt(x - 1, y)) && tileAt(x - 1, y) !== 9) {
+              ctx.fillStyle = "#d8be7d";
+              ctx.fillRect(px, py, 4, TILE);
+              ctx.fillStyle = "#1f5a8c";
+              ctx.fillRect(px + 4, py, 2, TILE);
+            }
+            if (!this._isWaterLike(tileAt(x + 1, y)) && tileAt(x + 1, y) !== 9) {
+              ctx.fillStyle = "#d8be7d";
+              ctx.fillRect(px + TILE - 4, py, 4, TILE);
+              ctx.fillStyle = "#1f5a8c";
+              ctx.fillRect(px + TILE - 6, py, 2, TILE);
+            }
+            if (!this._isWaterLike(tileAt(x, y - 1)) && tileAt(x, y - 1) !== 9) {
+              ctx.fillStyle = "#1f5a8c";
+              ctx.fillRect(px, py, TILE, 4);
+              ctx.fillStyle = "rgba(224, 242, 254, 0.72)";
+              ctx.fillRect(px, py + 4, TILE, 3);
+            }
+          }
+
+          // Water rocks & lilypads (tile 18)
+          if (tile === 18) {
+            if ((x + y) % 2 === 0) {
+              // Mossy River Boulder with ripple ring
+              ctx.fillStyle = "rgba(255,255,255,0.45)";
+              ctx.fillRect(px + 6, py + 24, 28, 8);
+              ctx.fillStyle = "#475569";
+              ctx.fillRect(px + 9, py + 11, 22, 16);
+              ctx.fillStyle = "#94a3b8";
+              ctx.fillRect(px + 11, py + 12, 16, 10);
+              ctx.fillStyle = "#4ade80";
+              ctx.fillRect(px + 13, py + 11, 9, 4);
+            } else {
+              // Floating Lilypad & Pink Lotus
+              ctx.fillStyle = "#166534";
+              ctx.fillRect(px + 9, py + 14, 18, 13);
+              ctx.fillStyle = "#4ade80";
+              ctx.fillRect(px + 10, py + 13, 16, 11);
+              ctx.fillStyle = "#3688c9";
+              ctx.fillRect(px + 22, py + 17, 5, 3);
+              ctx.fillStyle = "#f472b6";
+              ctx.fillRect(px + 14, py + 15, 5, 4);
+            }
+          }
+
+          // Wide Timber Bridge over river (tile 9)
+          if (tile === 9) {
+            ctx.fillStyle = "rgba(10, 22, 46, 0.42)";
+            ctx.fillRect(px, py + TILE - 6, TILE, 6);
+            ctx.fillStyle = "#6e3b17";
+            ctx.fillRect(px, py + 2, TILE, TILE - 6);
+            for (let b = 2; b < TILE - 2; b += 8) {
+              ctx.fillStyle = b % 16 === 2 ? "#a86936" : "#965a2c";
+              ctx.fillRect(px + b, py + 4, 6, TILE - 10);
+              ctx.fillStyle = "#45210a";
+              ctx.fillRect(px + b + 6, py + 4, 2, TILE - 10);
+            }
+            // Top & bottom bridge guardrails
+            ctx.fillStyle = "#d99a5b";
+            ctx.fillRect(px, py + 2, TILE, 3);
+            ctx.fillRect(px, py + TILE - 8, TILE, 3);
+            ctx.fillStyle = "#45210a";
+            ctx.fillRect(px + 1, py + 1, 5, 5);
+            ctx.fillRect(px + TILE - 6, py + 1, 5, 5);
           }
           continue;
         }
 
-        ctx.fillStyle = (x + y) % 2 === 0 ? zone.groundA : zone.groundB;
+        // Base Meadow Grass Texture (multi-tone pixel tufts, no ugly flat blocks)
+        ctx.fillStyle = pal.base;
         ctx.fillRect(px, py, TILE, TILE);
+        const seed = (x * 73856093 ^ y * 19349663) >>> 0;
+        ctx.fillStyle = pal.tuft;
+        ctx.fillRect(px + (seed % 14) + 4, py + ((seed >> 4) % 14) + 6, 4, 2);
+        ctx.fillRect(px + ((seed >> 8) % 14) + 18, py + ((seed >> 12) % 14) + 18, 4, 2);
+        if (seed % 5 === 0) {
+          ctx.fillStyle = pal.light;
+          ctx.fillRect(px + ((seed >> 3) % 18) + 8, py + ((seed >> 7) % 18) + 10, 3, 3);
+        }
 
-        if (tile === 6) {
-          ctx.fillStyle = (x + y) % 2 === 0 ? "#dfc07d" : "#d4b26a";
-          ctx.fillRect(px, py, TILE, TILE);
-          ctx.fillStyle = "#b89550";
-          ctx.fillRect(px + 9, py + 14, 4, 3);
-          ctx.fillRect(px + 26, py + 30, 3, 3);
-        } else if (tile === 7) {
-          // Nintendo cobble route
-          ctx.fillStyle = "#c9b382";
-          ctx.fillRect(px, py, TILE, TILE);
-          ctx.fillStyle = "#e0cd9f";
-          ctx.fillRect(px + 6, py + 6, 12, 8);
-          ctx.fillRect(px + 23, py + 22, 13, 9);
-          ctx.fillStyle = "#a68e5b";
-          ctx.fillRect(px + 24, py + 8, 9, 7);
-        } else if (tile === 9) {
-          ctx.fillStyle = "#164f82";
-          ctx.fillRect(px, py, TILE, TILE);
-          ctx.fillStyle = "#854d0e";
-          ctx.fillRect(px + 1, py + 3, TILE - 2, TILE - 6);
-          ctx.fillStyle = "#b45309";
-          for (let b = 4; b < TILE - 6; b += 8) {
-            ctx.fillRect(px + b, py + 5, 6, TILE - 10);
+        // Auto-Tiled Nintendo Dirt Road (tile 7) & Staircase (tile 11)
+        if (tile === 7 || tile === 11) {
+          ctx.fillStyle = "#c4a761";
+          ctx.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
+          ctx.fillStyle = "#dac07c";
+          ctx.fillRect(px + 4, py + 4, TILE - 8, TILE - 8);
+          if (this._isRoadLike(tileAt(x - 1, y))) ctx.fillRect(px, py + 4, 4, TILE - 8);
+          if (this._isRoadLike(tileAt(x + 1, y))) ctx.fillRect(px + TILE - 4, py + 4, 4, TILE - 8);
+          if (this._isRoadLike(tileAt(x, y - 1))) ctx.fillRect(px + 4, py, TILE - 8, 4);
+          if (this._isRoadLike(tileAt(x, y + 1))) ctx.fillRect(px + 4, py + TILE - 4, TILE - 8, 4);
+          // Warm sandy pebbles
+          ctx.fillStyle = "#b5954c";
+          ctx.fillRect(px + 10 + (seed % 8), py + 11, 3, 2);
+          ctx.fillRect(px + 24, py + 23 + (seed % 6), 4, 2);
+          ctx.fillStyle = "#efe0ab";
+          ctx.fillRect(px + 18, py + 17, 3, 2);
+
+          if (tile === 11) {
+            // Crisp Stone/Timber Staircase Steps across Cliff!
+            ctx.fillStyle = "#57534e";
+            ctx.fillRect(px + 3, py, TILE - 6, TILE);
+            for (let sy = 2; sy < TILE; sy += 8) {
+              ctx.fillStyle = "#d6d3d1";
+              ctx.fillRect(px + 5, py + sy, TILE - 10, 5);
+              ctx.fillStyle = "#78716c";
+              ctx.fillRect(px + 5, py + sy + 5, TILE - 10, 3);
+            }
           }
-          ctx.fillStyle = "#451a03";
-          ctx.fillRect(px + 1, py + 3, TILE - 2, 3);
-          ctx.fillRect(px + 1, py + TILE - 6, TILE - 2, 3);
-        } else {
-          const h = (x * 73 + y * 139) % 13;
-          if (h < 4) {
-            ctx.fillStyle = "rgba(255,255,255,0.1)";
-            ctx.fillRect(px + (h + 2) * 5, py + ((h * 7) % 22) + 6, 4, 3);
+          continue;
+        }
+
+        // 3D South Cliff Wall (tile 12) & Cave Door (tile 15)
+        if (tile === 12 || tile === 15) {
+          // Top grass overhang lip
+          ctx.fillStyle = pal.cliffTop;
+          ctx.fillRect(px, py, TILE, 8);
+          ctx.fillStyle = "#3f7d2f";
+          ctx.fillRect(px, py + 8, TILE, 3);
+          // 3D Terracotta Striated Rock Wall
+          ctx.fillStyle = pal.cliffA;
+          ctx.fillRect(px, py + 11, TILE, TILE - 11);
+          ctx.fillStyle = pal.cliffB;
+          ctx.fillRect(px, py + TILE - 8, TILE, 8);
+          // Vertical rock strata lines
+          for (let sx = 6; sx < TILE; sx += 11) {
+            ctx.fillStyle = "#5b3318";
+            ctx.fillRect(px + sx, py + 13, 2, TILE - 17);
+            ctx.fillStyle = "#ba7e4d";
+            ctx.fillRect(px + sx + 2, py + 14, 2, TILE - 20);
           }
-          if (tile === 8) {
-            const sway = Math.sin(t * 3 + x) > 0 ? 1 : 0;
-            ctx.fillStyle = "#16a34a";
-            ctx.fillRect(px + 10, py + 15, 7, 4);
-            ctx.fillRect(px + 25, py + 28, 7, 4);
-            ctx.fillStyle = (x + y) % 2 === 0 ? "#fde047" : "#f472b6";
-            ctx.fillRect(px + 11 + sway, py + 12, 5, 4);
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(px + 26 - sway, py + 25, 4, 4);
+          // Cave opening carved cleanly into cliff!
+          if (tile === 15) {
+            ctx.fillStyle = "#292524";
+            ctx.fillRect(px + 8, py + 13, TILE - 16, TILE - 13);
+            ctx.fillStyle = "#090d16";
+            ctx.fillRect(px + 11, py + 16, TILE - 22, TILE - 16);
+            ctx.fillStyle = "#78716c";
+            ctx.fillRect(px + 6, py + 11, 4, TILE - 11);
+            ctx.fillRect(px + TILE - 10, py + 11, 4, TILE - 11);
+          }
+          continue;
+        }
+
+        // Auto Elevation Side Bevels for raised ridges (left/right edges where elev drops)
+        if (el > elevAt(x - 1, y)) {
+          ctx.fillStyle = pal.cliffB;
+          ctx.fillRect(px, py, 4, TILE);
+        }
+        if (el > elevAt(x + 1, y)) {
+          ctx.fillStyle = pal.cliffB;
+          ctx.fillRect(px + TILE - 4, py, 4, TILE);
+        }
+        if (el > elevAt(x, y - 1)) {
+          ctx.fillStyle = pal.cliffB;
+          ctx.fillRect(px, py, TILE, 3);
+        }
+
+        // Colorful Flower Clusters & Red Toadstool Mushrooms (tile 8)
+        if (tile === 8) {
+          const sway = Math.sin(t * 2.8 + x * 0.9) > 0 ? 1 : 0;
+          const colors = ["#ef4444", "#fde047", "#38bdf8", "#f472b6"];
+          const c1 = colors[(x + y) % colors.length];
+          const c2 = colors[(x * 2 + y + 1) % colors.length];
+          ctx.fillStyle = "#166534";
+          ctx.fillRect(px + 8, py + 12, 8, 5);
+          ctx.fillRect(px + 22, py + 24, 8, 5);
+          ctx.fillStyle = c1;
+          ctx.fillRect(px + 9 + sway, py + 9, 6, 5);
+          ctx.fillStyle = c2;
+          ctx.fillRect(px + 23 - sway, py + 21, 6, 5);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(px + 11 + sway, py + 11, 2, 2);
+          ctx.fillRect(px + 25 - sway, py + 23, 2, 2);
+          if (seed % 3 === 0) {
+            // Tiny spotted mushroom
+            ctx.fillStyle = "#fef3c7";
+            ctx.fillRect(px + 10, py + 28, 3, 4);
+            ctx.fillStyle = "#dc2626";
+            ctx.fillRect(px + 8, py + 25, 7, 4);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(px + 9, py + 26, 2, 1);
           }
         }
       }
     }
 
-    // 2. Depth-sorted objects + Player Sprite inside camera viewport
-    const grassSprite = this.sprites.tall_grass;
+    // PASS 2: Depth-Sorted Overlapping Trees, Tall Grass, Fences, Gazebos, Overworld Pokemon & Trainer!
     const centerSprite = this.sprites.pokecenter;
     const npcSprite = this.sprites.npc_trainer;
     const playerTileY = Math.round(this.playerY);
+    const overPokes = m.overworld_pokemon || [];
 
     for (let y = minRow; y <= maxRow; y++) {
       for (let x = minCol; x <= maxCol; x++) {
@@ -643,81 +978,134 @@ class RPGRenderer {
         const py = Math.floor(y * TILE - this.camY);
         const zIdx = m.zone_grid ? (m.zone_grid[y]?.[x] ?? 0) : 0;
         const zone = m.zones?.[zIdx] || { weather: "sunny" };
-        const obsSprite = this.sprites[this.obstacleKeyForZone(zone.weather, m.biome)];
 
         if (tile === 1) {
-          const sway = Math.sin(t * 2.5 + x * 0.7 + y) * 1.4;
-          if (grassSprite && grassSprite.complete) {
-            ctx.drawImage(grassSprite, px + 2 + sway, py + 2, TILE - 4, TILE - 4);
-          }
+          // Layered animated Nintendo Tall Grass
+          const rustle = Math.abs(x - curTx) <= 0 && Math.abs(y - curTy) <= 0 ? Math.sin(t * 20) * 2 : Math.sin(t * 2.4 + x * 0.6 + y) * 1.1;
+          ctx.drawImage(this.tileAtlas.tall_grass, px + rustle, py + 2, TILE, TILE - 2);
         } else if (tile === 2) {
+          // Dense Overlapping Nintendo Canopy Tree (or Snow/Desert/Coast variant)
+          const obsKey = this.obstacleKeyForZone(zone.weather, m.biome);
           ctx.fillStyle = "rgba(0,0,0,0.28)";
           ctx.beginPath();
-          ctx.ellipse(px + TILE / 2, py + TILE - 6, TILE * 0.34, 6, 0, 0, Math.PI * 2);
+          ctx.ellipse(px + TILE / 2, py + TILE - 4, TILE * 0.42, 6, 0, 0, Math.PI * 2);
           ctx.fill();
-          if (obsSprite && obsSprite.complete) {
-            ctx.drawImage(obsSprite, px - 2, py - 8, TILE + 4, TILE + 6);
+          if (obsKey === "nintendo_tree") {
+            ctx.drawImage(this.tileAtlas.nintendo_tree, px - 4, py - 18, TILE + 8, TILE + 18);
+          } else if (this.sprites[obsKey]?.complete) {
+            ctx.drawImage(this.sprites[obsKey], px - 3, py - 10, TILE + 6, TILE + 10);
           }
         } else if (tile === 3) {
-          const glow = 0.25 + 0.15 * Math.sin(t * 3);
+          const glow = 0.25 + 0.14 * Math.sin(t * 3);
           ctx.fillStyle = `rgba(236, 72, 153, ${glow})`;
           ctx.beginPath();
-          ctx.ellipse(px + TILE / 2, py + TILE - 4, TILE * 0.52, 10, 0, 0, Math.PI * 2);
+          ctx.ellipse(px + TILE / 2, py + TILE - 2, TILE * 0.62, 10, 0, 0, Math.PI * 2);
           ctx.fill();
           if (centerSprite && centerSprite.complete) {
-            ctx.drawImage(centerSprite, px - 10, py - 18, TILE + 20, TILE + 18);
+            ctx.drawImage(centerSprite, px - 12, py - 24, TILE + 24, TILE + 24);
           }
         } else if (tile === 4) {
-          ctx.fillStyle = "rgba(0,0,0,0.3)";
+          ctx.fillStyle = "rgba(0,0,0,0.32)";
           ctx.beginPath();
-          ctx.ellipse(px + TILE / 2, py + TILE - 6, TILE * 0.28, 5, 0, 0, Math.PI * 2);
+          ctx.ellipse(px + TILE / 2, py + TILE - 5, TILE * 0.3, 5, 0, 0, Math.PI * 2);
           ctx.fill();
           if (npcSprite && npcSprite.complete) {
-            ctx.drawImage(npcSprite, px + 2, py - 4, TILE - 4, TILE);
+            ctx.drawImage(npcSprite, px + 2, py - 6, TILE - 4, TILE + 2);
           }
           const bob = Math.sin(t * 5) * 2.5;
           ctx.fillStyle = "#f59e0b";
           ctx.strokeStyle = "#111";
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.roundRect(px + TILE / 2 - 9, py - 18 + bob, 18, 16, 4);
+          ctx.roundRect(px + TILE / 2 - 9, py - 20 + bob, 18, 16, 4);
           ctx.fill();
           ctx.stroke();
           ctx.fillStyle = "#111";
           ctx.font = "bold 12px sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText("!", px + TILE / 2, py - 6 + bob);
+          ctx.fillText("!", px + TILE / 2, py - 8 + bob);
         } else if (tile === 10) {
-          // Landmark Wooden Signpost
+          ctx.fillStyle = "rgba(0,0,0,0.28)";
+          ctx.fillRect(px + 12, py + TILE - 7, 16, 4);
           ctx.fillStyle = "#5c3a1e";
-          ctx.fillRect(px + TILE / 2 - 3, py + TILE / 2, 6, 16);
+          ctx.fillRect(px + TILE / 2 - 3, py + TILE / 2, 6, 15);
           ctx.fillStyle = "#b45309";
           ctx.strokeStyle = "#291809";
           ctx.lineWidth = 2;
-          ctx.fillRect(px + 9, py + 10, TILE - 18, 15);
-          ctx.strokeRect(px + 9, py + 10, TILE - 18, 15);
+          ctx.fillRect(px + 7, py + 8, TILE - 14, 15);
+          ctx.strokeRect(px + 7, py + 8, TILE - 14, 15);
           ctx.fillStyle = "#fef3c7";
-          ctx.fillRect(px + 13, py + 14, TILE - 26, 2);
-          ctx.fillRect(px + 13, py + 19, TILE - 30, 2);
+          ctx.fillRect(px + 11, py + 12, TILE - 22, 2);
+          ctx.fillRect(px + 11, py + 17, TILE - 26, 2);
+        } else if (tile === 13) {
+          // Conical Slate Gazebo Rest Hut
+          ctx.fillStyle = "rgba(0,0,0,0.28)";
+          ctx.fillRect(px - 2, py + TILE - 6, TILE + 4, 6);
+          ctx.drawImage(this.tileAtlas.gazebo, px - 6, py - 22, TILE + 12, TILE + 22);
+        } else if (tile === 14) {
+          // Auto-Connected Wrought-Iron & Brick Park Fence
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
+          ctx.fillRect(px, py + TILE - 7, TILE, 5);
+          ctx.fillStyle = "#475569";
+          ctx.fillRect(px, py + 18, TILE, 3);
+          ctx.fillRect(px, py + 26, TILE, 3);
+          for (let fx = 4; fx < TILE; fx += 7) {
+            ctx.fillStyle = "#94a3b8";
+            ctx.fillRect(px + fx, py + 13, 3, 21);
+          }
+          // Brick pillar end-posts
+          if (tileAt(x - 1, y) !== 14 || tileAt(x + 1, y) !== 14) {
+            ctx.fillStyle = "#92400e";
+            ctx.fillRect(px + 14, py + 10, 12, 26);
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(px + 13, py + 9, 14, 4);
+          }
+        } else if (tile === 16) {
+          ctx.drawImage(this.tileAtlas.log, px + 2, py + 4, TILE - 4, TILE - 4);
+        } else if (tile === 17) {
+          // Warm glowing streetlamp
+          ctx.fillStyle = "rgba(253, 224, 71, 0.14)";
+          ctx.beginPath();
+          ctx.arc(px + TILE / 2, py + 6, 22 + Math.sin(t * 3) * 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.drawImage(this.tileAtlas.lamp, px + 4, py - 12, TILE - 8, TILE + 8);
         }
       }
 
+      // Draw Live Roaming Wild Pokémon on row y
+      for (const op of overPokes) {
+        if (op.y !== y) continue;
+        const hopX = Math.sin(t * 1.4 + op.x * 3) * 4;
+        const hopY = Math.abs(Math.sin(t * 4.2 + op.y * 2)) * 3;
+        const opx = Math.floor(op.x * TILE - this.camX + hopX);
+        const opy = Math.floor(op.y * TILE - this.camY);
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.beginPath();
+        ctx.ellipse(opx + TILE / 2, opy + TILE - 6, 11, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const pImg = this._getPokeMini(op.species_id);
+        if (pImg && pImg.complete) {
+          ctx.drawImage(pImg, opx - 2, opy - 10 - hopY, TILE + 4, TILE + 4);
+        }
+      }
+
+      // Draw Player Trainer Sprite on row playerTileY
       if (y === playerTileY) {
         const ppx = Math.floor(this.playerX * TILE - this.camX);
         const ppy = Math.floor(this.playerY * TILE - this.camY);
         const walkBob = moving ? Math.abs(Math.sin(t * 18)) * 4 : Math.sin(t * 2.5) * 0.8;
-        ctx.fillStyle = "rgba(0,0,0,0.34)";
+        ctx.fillStyle = "rgba(0,0,0,0.36)";
         ctx.beginPath();
-        ctx.ellipse(ppx + TILE / 2, ppy + TILE - 6, TILE * 0.28, 5.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(ppx + TILE / 2, ppy + TILE - 5, TILE * 0.3, 5.5, 0, 0, Math.PI * 2);
         ctx.fill();
         const pSprite = this.sprites[`trainer_${this.dir}`] || this.sprites.trainer_down;
         if (pSprite && pSprite.complete) {
-          ctx.drawImage(pSprite, ppx + 2, ppy - 6 - walkBob, TILE - 4, TILE);
+          ctx.drawImage(pSprite, ppx + 1, ppy - 8 - walkBob, TILE - 2, TILE + 2);
         }
       }
     }
 
-    // 3. Dynamic Current-Zone Weather Overlay
+    // PASS 3: Dynamic Weather Overlay
     const cw = curZone.weather || "sunny";
     if (cw === "mist") {
       ctx.fillStyle = "rgba(180, 195, 240, 0.14)";
@@ -756,40 +1144,40 @@ class RPGRenderer {
         w.x = (w.x + Math.cos(w.phase) * 0.35 + canvas.width) % canvas.width;
         w.y = (w.y + w.speed * 0.25) % canvas.height;
         w.phase += 0.03;
-        ctx.fillStyle = cw === "mist" ? "rgba(216, 180, 254, 0.45)" : "rgba(254, 240, 138, 0.35)";
+        ctx.fillStyle = cw === "mist" ? "rgba(216, 180, 254, 0.45)" : "rgba(254, 240, 138, 0.32)";
         ctx.beginPath();
         ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // 4. Nintendo-style Location & Weather HUD Banner (top-left)
+    // PASS 4: Location & Weather HUD Banner
     ctx.save();
-    ctx.fillStyle = "rgba(11, 17, 32, 0.82)";
+    ctx.fillStyle = "rgba(11, 17, 32, 0.84)";
     ctx.strokeStyle = "#38bdf8";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(12, 12, 290, 44, 10);
+    ctx.roundRect(12, 12, 300, 44, 8);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = "#f8fafc";
-    ctx.font = "bold 13px sans-serif";
+    ctx.font = 'bold 13px "Pixelify Sans", sans-serif';
     ctx.textAlign = "left";
-    ctx.fillText(`📍 ${curZone.name}`, 24, 31);
+    ctx.fillText(`📍 ${curZone.name}`, 22, 31);
     ctx.fillStyle = "#fde047";
-    ctx.font = "12px sans-serif";
-    ctx.fillText(`${curZone.weather_label} · Map ${m.width}×${m.height}`, 24, 48);
+    ctx.font = '12px "Pixelify Sans", sans-serif';
+    ctx.fillText(`${curZone.weather_label} · ${m.width}×${m.height} Nintendo Route`, 22, 48);
     ctx.restore();
 
-    // 5. Live Corner Minimap (top-right) showing entire giant connected map!
-    const mw = 128;
+    // PASS 5: Corner Minimap
+    const mw = 132;
     const mh = Math.round((mw * m.height) / m.width);
     const mx0 = canvas.width - mw - 12;
     const my0 = 12;
     ctx.save();
-    ctx.fillStyle = "rgba(8, 13, 25, 0.85)";
+    ctx.fillStyle = "rgba(8, 13, 25, 0.88)";
     ctx.strokeStyle = "#64748b";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.fillRect(mx0 - 2, my0 - 2, mw + 4, mh + 4);
     ctx.strokeRect(mx0 - 2, my0 - 2, mw + 4, mh + 4);
     const sx = mw / m.width;
@@ -797,15 +1185,15 @@ class RPGRenderer {
     for (let y = 0; y < m.height; y++) {
       for (let x = 0; x < m.width; x++) {
         const v = m.grid[y][x];
-        if (v === 5) ctx.fillStyle = "#0ea5e9";
-        else if (v === 7 || v === 9) ctx.fillStyle = "#d4b483";
+        if (v === 5 || v === 18) ctx.fillStyle = "#38bdf8";
+        else if (v === 7 || v === 9 || v === 11) ctx.fillStyle = "#e0c482";
         else if (v === 1) ctx.fillStyle = "#22c55e";
-        else if (v === 2) ctx.fillStyle = "#1e293b";
-        else ctx.fillStyle = "#475569";
+        else if (v === 12 || v === 15) ctx.fillStyle = "#925b31";
+        else if (v === 2) ctx.fillStyle = "#166534";
+        else ctx.fillStyle = "#4ade80";
         ctx.fillRect(mx0 + x * sx, my0 + y * sy, Math.ceil(sx), Math.ceil(sy));
       }
     }
-    // Landmarks & Player dots on Minimap
     for (const z of m.zones || []) {
       ctx.fillStyle = z.is_signature ? "#fbbf24" : "#f8fafc";
       ctx.fillRect(mx0 + z.cx * sx - 1, my0 + z.cy * sy - 1, 3, 3);

@@ -476,39 +476,104 @@ def get_country_encounter(country_id, trainer_level=1, force_exclusive=False, zo
 
 @functools.lru_cache(maxsize=256)
 def get_country_map_layout(country_id):
-    """Generate a large, seamless Nintendo-style 2D map combining all landmarks & weather zones."""
+    """Generate a rich multi-level Nintendo DS (HGSS/B2W2) style 2D map with terraces, cliffs, waterfalls, bridges, gazebos, fences & roaming Pokemon."""
     c = COUNTRIES_BY_ID.get(country_id) or COUNTRIES[0]
     landmarks = get_country_landmarks(c["id"])
     n_lm = len(landmarks)
 
-    # Map size scales directly with number of landmarks!
     size_table = {
-        2: (32, 24),
-        3: (40, 28),
-        4: (48, 34),
-        5: (56, 40),
+        2: (36, 26),
+        3: (44, 30),
+        4: (52, 36),
+        5: (58, 40),
         6: (64, 44),
     }
-    W, H = size_table.get(n_lm, (48, 34))
+    W, H = size_table.get(n_lm, (52, 36))
 
     seed = int(hashlib.sha256(c["id"].encode("utf-8")).hexdigest()[:8], 16)
     rng = random.Random(seed)
 
     # Tile codes:
-    # 0=ground, 1=tall_grass, 2=obstacle, 3=pokecenter, 4=ace_trainer,
-    # 5=water, 6=sand/shore, 7=road, 8=flowers, 9=bridge, 10=signpost
-    grid = [[0 for _ in range(W)] for _ in range(H)]
-    zone_grid = [[0 for _ in range(W)] for _ in range(H)]  # index into landmarks
+    # 0=grass, 1=tall_grass, 2=tree/obstacle, 3=pokecenter, 4=ace_trainer,
+    # 5=water, 6=sand/shore, 7=dirt_road, 8=flowers, 9=wood_bridge, 10=signpost,
+    # 11=stairs, 12=cliff_wall, 13=gazebo, 14=park_fence, 15=cave_door,
+    # 16=log_stump, 17=lamp_bench, 18=water_rock_lily
+    BLOCKED = {2, 5, 12, 13, 14, 16, 17, 18}
 
-    # Assign smooth Voronoi-like landmark zones across the huge map so each region has distinct weather!
+    grid = [[0 for _ in range(W)] for _ in range(H)]
+    elev = [[0 for _ in range(W)] for _ in range(H)]
+    zone_grid = [[0 for _ in range(W)] for _ in range(H)]
+
+    # 1. Assign elevation terraces (0=valley, 1=mid terrace, 2=northern highland ridge)
+    mid_top = max(8, H // 3)
+    for y in range(H):
+        for x in range(W):
+            if y < 6:
+                elev[y][x] = 2
+            elif y < mid_top or x < 9 or x >= W - 9:
+                elev[y][x] = 1
+            else:
+                elev[y][x] = 0
+
+    # Extra scenic central cliff island / ridge on wider maps
+    cx_mid = W // 2
+    for y in range(mid_top, H - 6):
+        for x in range(cx_mid - 7, cx_mid - 2):
+            if 0 <= x < W and y < H - 8:
+                elev[y][x] = 1
+
+    # 2. Outer dense double-row forest borders (Nintendo route framing!)
+    for y in range(H):
+        for x in range(W):
+            if x <= 1 or y <= 1 or x >= W - 2 or y >= H - 2:
+                grid[y][x] = 2
+            elif (x == 2 or y == 2 or x == W - 3 or y == H - 3) and rng.random() < 0.72:
+                grid[y][x] = 2
+
+    # 3. Auto-place 3D South-facing Cliff Walls wherever elev drops downward (elev[y-1] > elev[y])
+    for y in range(2, H - 2):
+        for x in range(2, W - 2):
+            if elev[y - 1][x] > elev[y][x]:
+                grid[y][x] = 12
+                # Add subtle upper treeline behind high ridge
+                if elev[y - 1][x] == 2 and y - 2 >= 2 and rng.random() < 0.45 and grid[y - 2][x] == 0:
+                    grid[y - 2][x] = 2
+
+    # 4. Crisp Main North-South River with Cascading Waterfall Steps + Optional West Stream!
+    rivers_x = [W // 2 + 2]
+    if W >= 48:
+        rivers_x.append(12)
+
+    for r_idx, base_rx in enumerate(rivers_x):
+        cur_rx = base_rx
+        river_half = 2 if r_idx == 0 else 1
+        for y in range(2, H - 2):
+            if y % 6 == 0 and r_idx == 0:
+                cur_rx = max(base_rx - 2, min(base_rx + 2, cur_rx + rng.choice([-1, 0, 1])))
+            for dx in range(-river_half + 1, river_half + 1):
+                rx = cur_rx + dx
+                if 2 <= rx < W - 2:
+                    # Keep river tiles clean; cliff drops automatically draw waterfalls in renderer!
+                    grid[y][rx] = 5
+                    # Sprinkle mossy stones & lilypads inside wider main river
+                    if r_idx == 0 and grid[y][rx] == 5 and y > 4 and elev[y - 1][rx] == elev[y][rx]:
+                        if rng.random() < 0.08:
+                            grid[y][rx] = 18
+
+    # 5. Partition landmarks smoothly across walkable regions (plazas on clearings)
     cols = 2 if n_lm <= 4 else 3
     rows = (n_lm + cols - 1) // cols
     centers = []
     for idx in range(n_lm):
         r_idx = idx // cols
         c_idx = idx % cols
-        zx = int((c_idx + 0.5) / cols * (W - 6)) + 3
-        zy = int((r_idx + 0.5) / rows * (H - 6)) + 3
+        zx = int((c_idx + 0.5) / cols * (W - 10)) + 5
+        zy = int((r_idx + 0.5) / rows * (H - 12)) + 6
+        # Avoid placing center directly on river or cliff wall
+        while zx < W - 4 and grid[zy][zx] in (5, 12, 18):
+            zx += 2
+        if grid[zy][zx] in (2, 5, 12, 18):
+            zx = min(W - 5, max(4, zx + 3))
         centers.append((zx, zy))
 
     for y in range(H):
@@ -516,104 +581,123 @@ def get_country_map_layout(country_id):
             best_i = 0
             best_d = 1e9
             for idx, (cx, cy) in enumerate(centers):
-                d = (x - cx) ** 2 + (y - cy) ** 2 + rng.randint(-6, 6)
+                d = (x - cx) ** 2 + (y - cy) ** 2 + rng.randint(-4, 4)
                 if d < best_d:
                     best_d = d
                     best_i = idx
             zone_grid[y][x] = best_i
 
-    # Outer border trees/cliffs & scenic meandering river across the region
-    for y in range(H):
-        for x in range(W):
-            if x == 0 or y == 0 or x == W - 1 or y == H - 1:
-                grid[y][x] = 2
-            elif x == 1 or y == 1 or x == W - 2 or y == H - 2:
-                if rng.random() < 0.65:
-                    grid[y][x] = 2
-
-    # Scenic winding river dividing regions horizontally/diagonally
-    river_y = H // 2
-    for x in range(2, W - 2):
-        ry = max(3, min(H - 4, river_y + int(2.2 * ((x * 0.4) % 3 - 1.5))))
-        grid[ry][x] = 5
-        if ry + 1 < H - 2 and rng.random() < 0.5:
-            grid[ry + 1][x] = 5
-
-    # Sandy banks next to water + scattered biome tree groves & flowers
-    for y in range(2, H - 2):
-        for x in range(2, W - 2):
-            if grid[y][x] != 0:
-                continue
-            adj_water = any(
-                0 <= y + dy < H and 0 <= x + dx < W and grid[y + dy][x + dx] == 5
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
-            )
-            if adj_water:
-                grid[y][x] = 6
-            else:
-                roll = rng.random()
-                if roll < 0.14:
-                    grid[y][x] = 2
-                elif roll < 0.24:
-                    grid[y][x] = 8
-
-    # Each landmark gets rich tall-grass hunting meadows + a landmark signpost
+    # 6. Carve structured Landmark Courtyards: Plaza + Fences + Gazebo + Tall Grass Fields + Signpost!
     for idx, (cx, cy) in enumerate(centers):
-        # Clear central plaza around landmark center
+        my_elev = elev[cy][cx]
+        # Courtyard platform 5x5 unified at my_elev
         for dy in range(-2, 3):
             for dx in range(-2, 3):
-                px, py = max(2, min(W - 3, cx + dx)), max(2, min(H - 3, cy + dy))
-                if grid[py][px] != 5:
-                    grid[py][px] = 0
-        # Tall grass meadow nearby (2 clusters per landmark)
-        for ox, oy in ((-4, 2), (3, -3)):
-            mx = max(3, min(W - 6, cx + ox))
-            my = max(3, min(H - 5, cy + oy))
+                px, py = max(3, min(W - 4, cx + dx)), max(3, min(H - 4, cy + dy))
+                if grid[py][px] not in (5, 18):
+                    elev[py][px] = my_elev
+                    grid[py][px] = 7 if abs(dx) <= 1 and abs(dy) <= 1 else 0
+
+        # Neat Park Iron Fences edging top-left/bottom-right of alternate plazas (like screenshot!)
+        if idx % 2 == 1:
+            for fx in range(cx - 2, cx + 2):
+                fy = cy - 2
+                if 3 <= fx < W - 3 and 3 <= fy < H - 3 and grid[fy][fx] in (0, 8):
+                    grid[fy][fx] = 14
+            # Gazebo rest hut right beside plaza
+            gx, gy = cx + 2, cy - 1
+            if 3 <= gx < W - 3 and 3 <= gy < H - 3 and grid[gy][gx] not in (5, 18):
+                grid[gy][gx] = 13
+
+        # Signpost & Lamp next to plaza
+        sx_sign, sy_sign = max(3, cx - 2), max(3, cy)
+        if grid[sy_sign][sx_sign] not in (5, 18, 13):
+            grid[sy_sign][sx_sign] = 10
+        lx, ly = min(W - 4, cx + 2), min(H - 4, cy + 1)
+        if grid[ly][lx] in (0, 8):
+            grid[ly][lx] = 17
+
+        # Neat rectangular 4x3 Tall Grass hunting meadows near each landmark
+        for ox, oy in ((-5, 2), (3, -4)):
+            mx = max(3, min(W - 7, cx + ox))
+            my = max(3, min(H - 6, cy + oy))
             for dy in range(3):
                 for dx in range(4):
                     tx, ty = mx + dx, my + dy
-                    if 2 <= tx < W - 2 and 2 <= ty < H - 2 and grid[ty][tx] != 5:
+                    if 3 <= tx < W - 3 and 3 <= ty < H - 3 and grid[ty][tx] == 0:
                         grid[ty][tx] = 1
-        # Signpost near plaza
-        sx_sign = max(2, min(W - 3, cx - 2))
-        sy_sign = max(2, min(H - 3, cy - 1))
-        if grid[sy_sign][sx_sign] != 5:
-            grid[sy_sign][sx_sign] = 10
 
-    # Place Spawn & PokéCenter in Landmark 0, Ace Trainer in final signature landmark
-    sx, sy = centers[0]
-    hx, hy = max(2, sx + 2), max(2, sy - 2)
-    tx, ty = centers[-1]
-
-    # Connect ALL landmark centers seamlessly with Nintendo cobble routes + wooden bridges over rivers!
-    def carve_route(x0, y0, x1, y1):
+    # 7. Connect landmarks with clean 2-tile orthogonally stepped Nintendo dirt paths, bridges & stairs!
+    def carve_nintendo_route(x0, y0, x1, y1):
+        # Elbow L-shaped / stepped path for crisp retro route geometry
+        mid_x = x1 if rng.random() < 0.5 else (x0 + x1) // 2
+        pts = []
         cx, cy = x0, y0
-        while (cx, cy) != (x1, y1):
-            if cx != x1 and (cy == y1 or rng.random() < 0.55):
-                cx += 1 if x1 > cx else -1
-            elif cy != y1:
-                cy += 1 if y1 > cy else -1
-            for wdx, wdy in ((0, 0), (1, 0)):
-                rx, ry = max(2, min(W - 3, cx + wdx)), max(2, min(H - 3, cy + wdy))
-                if grid[ry][rx] == 5:
-                    grid[ry][rx] = 9  # Bridge!
-                elif grid[ry][rx] not in (3, 4, 10):
+        while cx != mid_x:
+            cx += 1 if mid_x > cx else -1
+            pts.append((cx, cy))
+        while cy != y1:
+            cy += 1 if y1 > cy else -1
+            pts.append((cx, cy))
+        while cx != x1:
+            cx += 1 if x1 > cx else -1
+            pts.append((cx, cy))
+
+        for px, py in pts:
+            for wdx, wdy in ((0, 0), (1, 0), (0, 1)):
+                rx = max(2, min(W - 3, px + wdx))
+                ry = max(2, min(H - 3, py + wdy))
+                cur = grid[ry][rx]
+                if cur in (5, 18):
+                    grid[ry][rx] = 9  # Wooden bridge over river!
+                elif cur == 12:
+                    grid[ry][rx] = 11  # Stone/wood staircase through cliff wall!
+                elif cur not in (3, 4, 9, 10, 11):
                     grid[ry][rx] = 7
 
     for i in range(len(centers) - 1):
-        carve_route(centers[i][0], centers[i][1], centers[i + 1][0], centers[i + 1][1])
+        carve_nintendo_route(centers[i][0], centers[i][1], centers[i + 1][0], centers[i + 1][1])
     if len(centers) >= 3:
-        carve_route(centers[0][0], centers[0][1], centers[-1][0], centers[-1][1])
+        carve_nintendo_route(centers[0][0], centers[0][1], centers[-1][0], centers[-1][1])
+
+    # Place Cave entrances tucked naturally into spare cliff walls (tile 12) next to clear ground!
+    caves_placed = 0
+    for y in range(4, H - 4):
+        for x in range(4, W - 4):
+            if grid[y][x] == 12 and grid[y + 1][x] in (0, 7, 8) and grid[y][x - 1] == 12 and grid[y][x + 1] == 12:
+                if caves_placed < 2 and rng.random() < 0.14:
+                    grid[y][x] = 15
+                    caves_placed += 1
+
+    # Decorate remaining open clearings with flower meadows, tree groves & fallen logs
+    for y in range(3, H - 3):
+        for x in range(3, W - 3):
+            if grid[y][x] != 0:
+                continue
+            roll = rng.random()
+            if roll < 0.095:
+                grid[y][x] = 2
+            elif roll < 0.19:
+                grid[y][x] = 8
+            elif roll < 0.215:
+                grid[y][x] = 16  # Fallen mossy log / stump
+
+    # 8. Place Spawn, PokéCenter & Ace Trainer with guaranteed front entry access
+    sx, sy = centers[0]
+    hx, hy = max(3, min(W - 4, sx + 2)), max(3, min(H - 4, sy - 2))
+    tx, ty = centers[-1]
+    if grid[hy][hx] in (5, 18, 12):
+        hx, hy = max(3, sx + 1), min(H - 4, sy + 1)
 
     grid[sy][sx] = 7
     grid[hy][hx] = 3
     grid[ty][tx] = 4
-    if ty + 1 < H - 2 and grid[ty + 1][tx] in (2, 5):
-        grid[ty + 1][tx] = 7
-    if hy + 1 < H - 2 and grid[hy + 1][hx] in (2, 5):
+    if hy + 1 < H - 2 and grid[hy + 1][hx] in BLOCKED:
         grid[hy + 1][hx] = 7
+    if ty + 1 < H - 2 and grid[ty + 1][tx] in BLOCKED:
+        grid[ty + 1][tx] = 7
 
-    # Guarantee BFS reachability for PokéCenter, Ace Trainer, and all Landmark centers
+    # 9. Guarantee BFS reachability across walkable tiles (not in BLOCKED)
     def bfs():
         seen = {(sx, sy)}
         q = deque([(sx, sy)])
@@ -621,7 +705,7 @@ def get_country_map_layout(country_id):
             qx, qy = q.popleft()
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 nx, ny = qx + dx, qy + dy
-                if 0 <= nx < W and 0 <= ny < H and (nx, ny) not in seen and grid[ny][nx] not in (2, 5):
+                if 0 <= nx < W and 0 <= ny < H and (nx, ny) not in seen and grid[ny][nx] not in BLOCKED:
                     seen.add((nx, ny))
                     q.append((nx, ny))
         return seen
@@ -629,11 +713,31 @@ def get_country_map_layout(country_id):
     reach = bfs()
     for target in [(hx, hy), (tx, ty)] + centers:
         if target not in reach:
-            carve_route(sx, sy, target[0], target[1])
+            carve_nintendo_route(sx, sy, target[0], target[1])
             grid[hy][hx] = 3
             grid[ty][tx] = 4
 
-    # Prepare lightweight zone summaries for client HUD, minimap & weather effects
+    # 10. Pick 8 Overworld Roaming Wild Pokemon sprites placed safely on walkable grass/clearings
+    reach = bfs()
+    walk_candidates = [
+        (px, py) for (px, py) in reach
+        if grid[py][px] in (0, 1, 8) and abs(px - sx) + abs(py - sy) >= 4
+    ]
+    rng.shuffle(walk_candidates)
+    overworld_pokemon = []
+    for ox, oy in walk_candidates[:8]:
+        z_idx = zone_grid[oy][ox]
+        lm = landmarks[z_idx]
+        pool = lm["pokemon_pool"] or c["local_pool"]
+        if pool:
+            pid = rng.choice(pool)
+            overworld_pokemon.append({
+                "species_id": pid,
+                "name": POKEMON_BY_ID[pid]["name"],
+                "x": ox,
+                "y": oy,
+            })
+
     zones_meta = []
     for idx, lm in enumerate(landmarks):
         wdef = WEATHER_DEFS[lm["weather"]]
@@ -665,6 +769,8 @@ def get_country_map_layout(country_id):
         "biome": c["biome"],
         "palette": BIOME_PALETTE.get(c["biome"], BIOME_PALETTE["forest"]),
         "grid": grid,
+        "elev_grid": elev,
         "zone_grid": zone_grid,
         "zones": zones_meta,
+        "overworld_pokemon": overworld_pokemon,
     }
