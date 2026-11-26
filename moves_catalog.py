@@ -1,4 +1,13 @@
 import functools
+import json
+import os
+
+_MOVES_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "species_moves.json")
+if os.path.exists(_MOVES_JSON_PATH):
+    with open(_MOVES_JSON_PATH, "r", encoding="utf-8") as _f:
+        CANON_SPECIES_MOVES = json.load(_f)
+else:
+    CANON_SPECIES_MOVES = {}
 
 # Comprehensive canonical move pools across all 18 Pokemon types.
 # Each entry: (name, base_power, accuracy, crit_bonus)
@@ -368,6 +377,9 @@ def _build_cached_moves(species_id, primary, secondary, tier, bst):
 
 
 def build_moves_for_species(species_id, pokemon_by_id):
+    canon = CANON_SPECIES_MOVES.get(str(int(species_id)))
+    if canon:
+        return [dict(m) for m in canon]
     sp = pokemon_by_id.get(species_id) or pokemon_by_id[25]
     types = sp.get("types") or ["normal"]
     primary = types[0]
