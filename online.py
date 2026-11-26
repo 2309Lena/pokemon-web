@@ -6,9 +6,37 @@ import time
 from battle import calc_damage, fighter_from_user_pokemon
 from db import award_trainer_xp, get_conn, get_user_team, serialize_user_pokemon
 
+ROOM_IDLE_TIMEOUT = 180  # 3 phút (giây) không có hoạt động → tự xoá phòng
+
 
 def _gen_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+def _touch_room(conn, room_id):
+    """Cập nhật last_activity_at mỗi khi có hành động trong phòng."""
+    conn.execute(
+        "UPDATE online_rooms SET last_activity_at = ? WHERE id = ?",
+        (time.time(), room_id),
+    )
+
+
+def cleanup_idle_rooms():
+    """Đóng tất cả phòng waiting/in_progress không có hoạt động trong 3 phút.
+    Được gọi định kỳ bởi background thread trong app.py."""
+    cutoff = time.time() - ROOM_IDLE_TIMEOUT
+    conn = get_conn()
+    conn.execute(
+        """
+        UPDATE online_rooms
+        SET status = 'closed'
+        WHERE status IN ('waiting', 'in_progress')
+          AND COALESCE(last_activity_at, created_at) < ?
+        """,
+        (cutoff,),
+    )
+    conn.commit()
+    conn.close()
 
 
 def _format_room(conn, r):
@@ -87,20 +115,32 @@ def get_room(room_id):
     return res
 
 
+def _ensure_last_activity_col():
+    """Migration: thêm cột last_activity_at nếu chưa có."""
+    conn = get_conn()
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(online_rooms)").fetchall()]
+    if "last_activity_at" not in cols:
+        conn.execute("ALTER TABLE online_rooms ADD COLUMN last_activity_at REAL")
+        conn.commit()
+    conn.close()
+
+
 def create_room(user_id, title, mode="pvp_3v3", max_slots=4):
+    _ensure_last_activity_col()
     if mode not in ("pvp_3v3", "pvp_6v6", "trade"):
         return None, "Chế độ phòng không hợp lệ."
     max_slots = max(2, min(10, int(max_slots or 4)))
     title = (title or "Phòng Đấu Pokémon").strip()[:40]
     code = _gen_code()
+    now = time.time()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO online_rooms (code, title, host_user_id, mode, max_slots, status, state_json, created_at)
-        VALUES (?, ?, ?, ?, ?, 'waiting', '{}', ?)
+        INSERT INTO online_rooms (code, title, host_user_id, mode, max_slots, status, state_json, created_at, last_activity_at)
+        VALUES (?, ?, ?, ?, ?, 'waiting', '{}', ?, ?)
         """,
-        (code, title, user_id, mode, max_slots, time.time()),
+        (code, title, user_id, mode, max_slots, now, now),
     )
     rid = cur.lastrowid
     cur.execute(
@@ -150,6 +190,7 @@ def join_room(user_id, room_id_or_code):
         "INSERT INTO room_players (room_id, user_id, slot_index, ready) VALUES (?, ?, ?, 0)",
         (r["id"], user_id, next_slot),
     )
+    _touch_room(conn, r["id"])
     conn.commit()
     conn.close()
     return get_room(r["id"]), None
@@ -201,6 +242,7 @@ def toggle_pvp_ready(user_id, room_id):
         "UPDATE room_players SET ready = ?, team_json = ? WHERE room_id = ? AND user_id = ?",
         (new_ready, json.dumps(team), room_id, user_id),
     )
+    _touch_room(conn, room_id)
     conn.commit()
 
     # Check if top 2 slot players are both ready -> Start PvP Battle!
@@ -335,6 +377,7 @@ def submit_pvp_action(user_id, room_id, action, param=0):
             "UPDATE online_rooms SET state_json = ? WHERE id = ?",
             (json.dumps(st), room_id),
         )
+    _touch_room(conn, room_id)
 
     conn.commit()
     conn.close()
@@ -361,6 +404,7 @@ def select_trade_pokemon(user_id, room_id, user_pokemon_id):
         "UPDATE room_players SET offer_pokemon_id = ? WHERE room_id = ? AND user_id = ?",
         (user_pokemon_id, room_id, user_id),
     )
+    _touch_room(conn, room_id)
     conn.commit()
     conn.close()
     return get_room(room_id), None

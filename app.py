@@ -6,6 +6,7 @@ import hmac
 import os
 import secrets
 import subprocess
+import threading
 import time
 from functools import wraps
 
@@ -49,6 +50,7 @@ from friends_salvage import (
     send_friend_request,
 )
 from online import (
+    cleanup_idle_rooms,
     confirm_trade,
     create_room,
     get_room,
@@ -103,6 +105,22 @@ def _get_secret_key():
 
 app = Flask(__name__)
 app.secret_key = _get_secret_key()
+
+
+# ── Background: tự động dọn phòng idle mỗi 60 giây ──────────────────────────
+def _room_cleanup_loop():
+    """Chạy ngầm: cứ 60s quét và đóng các phòng không hoạt động > 3 phút."""
+    while True:
+        try:
+            cleanup_idle_rooms()
+        except Exception:
+            pass
+        time.sleep(60)
+
+
+_cleanup_thread = threading.Thread(target=_room_cleanup_loop, daemon=True)
+_cleanup_thread.start()
+# ─────────────────────────────────────────────────────────────────────────────
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
