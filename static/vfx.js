@@ -593,14 +593,12 @@ class RPGRenderer {
       g.fillRect(10, 11, 3, 1);
     });
 
-    // 5. Park Streetlamp & Bench (20x26)
+    // Re-attach 5. Park Streetlamp & 6. Terrain 16x16 Atlases cleanly
     this.tileAtlas.lamp = this._pxCanvas(20, 26, (g) => {
-      // Base pedestal
       g.fillStyle = "#1e293b";
       g.fillRect(8, 20, 4, 5);
       g.fillStyle = "#334155";
       g.fillRect(9, 7, 2, 14);
-      // Lantern head + warm light
       g.fillStyle = "#0f172a";
       g.fillRect(7, 2, 6, 6);
       g.fillStyle = "#fde047";
@@ -609,6 +607,85 @@ class RPGRenderer {
       g.fillRect(9, 4, 2, 2);
       g.fillStyle = "#475569";
       g.fillRect(8, 1, 4, 1);
+    });
+
+    // 6. Crisp 16x16 Pre-Baked Pixel Terrain Tiles (Zero Flat 2D Look!)
+    const makeGrassTile = (base, mid, dark, hi, seedOffset) =>
+      this._pxCanvas(16, 16, (g) => {
+        g.fillStyle = base;
+        g.fillRect(0, 0, 16, 16);
+        for (let py = 0; py < 16; py++) {
+          for (let px = 0; px < 16; px++) {
+            const n = ((px * 37 + py * 91 + seedOffset * 53) ^ (px * 13)) & 15;
+            if (n < 3) {
+              g.fillStyle = mid;
+              g.fillRect(px, py, 1, 1);
+            } else if (n === 7) {
+              g.fillStyle = dark;
+              g.fillRect(px, py, 1, 2);
+            } else if (n === 14) {
+              g.fillStyle = hi;
+              g.fillRect(px, py, 1, 1);
+            }
+          }
+        }
+        // Subtle 3-pixel clover/blade cluster
+        g.fillStyle = dark;
+        g.fillRect(3 + (seedOffset % 5), 4, 1, 2);
+        g.fillRect(4 + (seedOffset % 5), 5, 1, 1);
+        g.fillStyle = hi;
+        g.fillRect(10, 10 - (seedOffset % 3), 1, 1);
+        g.fillRect(11, 11 - (seedOffset % 3), 1, 1);
+      });
+
+    this.tileAtlas.grass_sunny_0 = makeGrassTile("#62c74f", "#57b945", "#439935", "#7ce063", 1);
+    this.tileAtlas.grass_sunny_1 = makeGrassTile("#5ec24b", "#52b241", "#3e9231", "#78dc5e", 4);
+    this.tileAtlas.grass_snow_0 = makeGrassTile("#95d0e8", "#83c0d9", "#69a5bf", "#c4ecfa", 2);
+    this.tileAtlas.grass_snow_1 = makeGrassTile("#8ecae2", "#7bb9d3", "#619db8", "#bfe7f8", 5);
+    this.tileAtlas.grass_desert_0 = makeGrassTile("#d9b368", "#caa256", "#ab8339", "#ebd08e", 3);
+    this.tileAtlas.grass_desert_1 = makeGrassTile("#d2ab60", "#c29a4f", "#a37c33", "#e6c985", 6);
+    this.tileAtlas.grass_rain_0 = makeGrassTile("#4db857", "#40a349", "#2f8538", "#6ed46d", 7);
+    this.tileAtlas.grass_rain_1 = makeGrassTile("#48b252", "#3b9d44", "#2b7e34", "#68ce68", 8);
+
+    this.tileAtlas.road_16 = this._pxCanvas(16, 16, (g) => {
+      g.fillStyle = "#d9c17e";
+      g.fillRect(0, 0, 16, 16);
+      for (let py = 0; py < 16; py++) {
+        for (let px = 0; px < 16; px++) {
+          const n = (px * 41 + py * 73) & 15;
+          if (n === 2 || n === 9) {
+            g.fillStyle = "#c4a761";
+            g.fillRect(px, py, 2, 1);
+          } else if (n === 13) {
+            g.fillStyle = "#efe0ab";
+            g.fillRect(px, py, 1, 1);
+          }
+        }
+      }
+      g.fillStyle = "#b5954c";
+      g.fillRect(3, 11, 2, 2);
+      g.fillRect(11, 4, 2, 1);
+    });
+
+    this.tileAtlas.cliff_16 = this._pxCanvas(16, 16, (g) => {
+      // Grass overhang + dark rim
+      g.fillStyle = "#75d95c";
+      g.fillRect(0, 0, 16, 3);
+      g.fillStyle = "#48aa3b";
+      g.fillRect(0, 3, 16, 1);
+      g.fillStyle = "#2b5e22";
+      g.fillRect(0, 4, 16, 1);
+      // 3D Striated Terracotta Cliff Face
+      g.fillStyle = "#9b6438";
+      g.fillRect(0, 5, 16, 11);
+      g.fillStyle = "#744522";
+      g.fillRect(0, 13, 16, 3);
+      for (let cx = 2; cx < 16; cx += 5) {
+        g.fillStyle = "#5c3416";
+        g.fillRect(cx, 6, 1, 8);
+        g.fillStyle = "#bd8151";
+        g.fillRect(cx + 1, 6, 1, 6);
+      }
     });
   }
 
@@ -626,8 +703,8 @@ class RPGRenderer {
     this.playerY = spawn.y;
     this.targetX = spawn.x;
     this.targetY = spawn.y;
-    this.camX = Math.max(0, spawn.x * 40 - 400);
-    this.camY = Math.max(0, spawn.y * 40 - 280);
+    this.camX = Math.max(0, spawn.x * 32 - 400);
+    this.camY = Math.max(0, spawn.y * 32 - 280);
     this.dir = "down";
     this.initWeather();
     this.startLoop();
@@ -705,9 +782,15 @@ class RPGRenderer {
     ctx.imageSmoothingEnabled = false;
 
     const m = this.mapData;
-    const TILE = 40;
+    const TILE = 32;
     const worldW = m.width * TILE;
     const worldH = m.height * TILE;
+    const grassKeyPrefix = (weather, biome) => {
+      if (weather === "snow" || biome === "glacier" || biome === "taiga") return "snow";
+      if (weather === "sandstorm" || biome === "desert") return "desert";
+      if (weather === "rain" || weather === "mist") return "rain";
+      return "sunny";
+    };
     const elevAt = (x, y) => (m.elev_grid && m.elev_grid[y]?.[x] !== undefined ? m.elev_grid[y][x] : 0);
     const tileAt = (x, y) => (y >= 0 && y < m.height && x >= 0 && x < m.width ? m.grid[y][x] : 2);
 
@@ -847,77 +930,56 @@ class RPGRenderer {
           continue;
         }
 
-        // Base Meadow Grass Texture (multi-tone pixel tufts, no ugly flat blocks)
-        ctx.fillStyle = pal.base;
-        ctx.fillRect(px, py, TILE, TILE);
+        // Base 16x16 Baked Pixel Meadow Grass Texture (scaled crisp 2x!)
+        const gk = grassKeyPrefix(zone.weather, m.biome);
+        const gTile = this.tileAtlas[`grass_${gk}_${(x + y) & 1}`] || this.tileAtlas.grass_sunny_0;
+        ctx.drawImage(gTile, px, py, TILE, TILE);
         const seed = (x * 73856093 ^ y * 19349663) >>> 0;
-        ctx.fillStyle = pal.tuft;
-        ctx.fillRect(px + (seed % 14) + 4, py + ((seed >> 4) % 14) + 6, 4, 2);
-        ctx.fillRect(px + ((seed >> 8) % 14) + 18, py + ((seed >> 12) % 14) + 18, 4, 2);
-        if (seed % 5 === 0) {
-          ctx.fillStyle = pal.light;
-          ctx.fillRect(px + ((seed >> 3) % 18) + 8, py + ((seed >> 7) % 18) + 10, 3, 3);
-        }
 
-        // Auto-Tiled Nintendo Dirt Road (tile 7) & Staircase (tile 11)
+        // Auto-Tiled 16x16 Dirt Road (tile 7) with Jagged Grass Borders & Staircase (tile 11)
         if (tile === 7 || tile === 11) {
-          ctx.fillStyle = "#c4a761";
-          ctx.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
-          ctx.fillStyle = "#dac07c";
-          ctx.fillRect(px + 4, py + 4, TILE - 8, TILE - 8);
-          if (this._isRoadLike(tileAt(x - 1, y))) ctx.fillRect(px, py + 4, 4, TILE - 8);
-          if (this._isRoadLike(tileAt(x + 1, y))) ctx.fillRect(px + TILE - 4, py + 4, 4, TILE - 8);
-          if (this._isRoadLike(tileAt(x, y - 1))) ctx.fillRect(px + 4, py, TILE - 8, 4);
-          if (this._isRoadLike(tileAt(x, y + 1))) ctx.fillRect(px + 4, py + TILE - 4, TILE - 8, 4);
-          // Warm sandy pebbles
-          ctx.fillStyle = "#b5954c";
-          ctx.fillRect(px + 10 + (seed % 8), py + 11, 3, 2);
-          ctx.fillRect(px + 24, py + 23 + (seed % 6), 4, 2);
-          ctx.fillStyle = "#efe0ab";
-          ctx.fillRect(px + 18, py + 17, 3, 2);
+          ctx.drawImage(this.tileAtlas.road_16, px, py, TILE, TILE);
+          if (!this._isRoadLike(tileAt(x - 1, y))) {
+            ctx.fillStyle = pal.cliffTop;
+            ctx.fillRect(px, py, 2, TILE);
+          }
+          if (!this._isRoadLike(tileAt(x + 1, y))) {
+            ctx.fillStyle = pal.cliffTop;
+            ctx.fillRect(px + TILE - 2, py, 2, TILE);
+          }
+          if (!this._isRoadLike(tileAt(x, y - 1))) {
+            ctx.fillStyle = pal.cliffTop;
+            ctx.fillRect(px, py, TILE, 2);
+          }
+          if (!this._isRoadLike(tileAt(x, y + 1))) {
+            ctx.fillStyle = pal.tuft;
+            ctx.fillRect(px, py + TILE - 2, TILE, 2);
+          }
 
           if (tile === 11) {
-            // Crisp Stone/Timber Staircase Steps across Cliff!
             ctx.fillStyle = "#57534e";
-            ctx.fillRect(px + 3, py, TILE - 6, TILE);
-            for (let sy = 2; sy < TILE; sy += 8) {
+            ctx.fillRect(px + 2, py, TILE - 4, TILE);
+            for (let sy = 2; sy < TILE; sy += 7) {
               ctx.fillStyle = "#d6d3d1";
-              ctx.fillRect(px + 5, py + sy, TILE - 10, 5);
+              ctx.fillRect(px + 4, py + sy, TILE - 8, 4);
               ctx.fillStyle = "#78716c";
-              ctx.fillRect(px + 5, py + sy + 5, TILE - 10, 3);
+              ctx.fillRect(px + 4, py + sy + 4, TILE - 8, 3);
             }
           }
           continue;
         }
 
-        // 3D South Cliff Wall (tile 12) & Cave Door (tile 15)
+        // 3D South Cliff Wall (tile 12) & Cave Door (tile 15) from baked pixel cliff sprite
         if (tile === 12 || tile === 15) {
-          // Top grass overhang lip
-          ctx.fillStyle = pal.cliffTop;
-          ctx.fillRect(px, py, TILE, 8);
-          ctx.fillStyle = "#3f7d2f";
-          ctx.fillRect(px, py + 8, TILE, 3);
-          // 3D Terracotta Striated Rock Wall
-          ctx.fillStyle = pal.cliffA;
-          ctx.fillRect(px, py + 11, TILE, TILE - 11);
-          ctx.fillStyle = pal.cliffB;
-          ctx.fillRect(px, py + TILE - 8, TILE, 8);
-          // Vertical rock strata lines
-          for (let sx = 6; sx < TILE; sx += 11) {
-            ctx.fillStyle = "#5b3318";
-            ctx.fillRect(px + sx, py + 13, 2, TILE - 17);
-            ctx.fillStyle = "#ba7e4d";
-            ctx.fillRect(px + sx + 2, py + 14, 2, TILE - 20);
-          }
-          // Cave opening carved cleanly into cliff!
+          ctx.drawImage(this.tileAtlas.cliff_16, px, py, TILE, TILE);
           if (tile === 15) {
             ctx.fillStyle = "#292524";
-            ctx.fillRect(px + 8, py + 13, TILE - 16, TILE - 13);
+            ctx.fillRect(px + 6, py + 11, TILE - 12, TILE - 11);
             ctx.fillStyle = "#090d16";
-            ctx.fillRect(px + 11, py + 16, TILE - 22, TILE - 16);
+            ctx.fillRect(px + 9, py + 14, TILE - 18, TILE - 14);
             ctx.fillStyle = "#78716c";
-            ctx.fillRect(px + 6, py + 11, 4, TILE - 11);
-            ctx.fillRect(px + TILE - 10, py + 11, 4, TILE - 11);
+            ctx.fillRect(px + 5, py + 9, 3, TILE - 9);
+            ctx.fillRect(px + TILE - 8, py + 9, 3, TILE - 9);
           }
           continue;
         }

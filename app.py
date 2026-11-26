@@ -98,10 +98,25 @@ app.secret_key = _get_secret_key()
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
+def _compute_asset_ver():
+    base = os.path.dirname(os.path.abspath(__file__))
+    mtimes = []
+    for rel in ("static/style.css", "static/vfx.js", "static/app.js"):
+        p = os.path.join(base, rel)
+        if os.path.exists(p):
+            mtimes.append(int(os.path.getmtime(p)))
+    return str(max(mtimes) if mtimes else 1)
+
+
+ASSET_VER = _compute_asset_ver()
+
+
 @app.after_request
 def optimize_response(resp):
-    if request.path.startswith("/static/") and resp.status_code == 200:
+    if request.path.startswith("/static/assets/") and resp.status_code == 200:
         resp.headers["Cache-Control"] = "public, max-age=86400"
+    elif request.path.startswith("/static/") and resp.status_code == 200:
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
     if (
         resp.status_code == 200
         and not resp.direct_passthrough
@@ -145,7 +160,7 @@ def login_required(fn):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", asset_v=ASSET_VER)
 
 
 @app.route("/api/register", methods=["POST"])
