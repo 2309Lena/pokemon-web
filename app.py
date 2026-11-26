@@ -145,7 +145,7 @@ SHOP_ITEMS = [
     {"key": "master_ball", "name": "Master Ball", "price": 1500, "icon": "/static/assets/items/master-ball.png", "desc": "Bắt chắc chắn 100% không trượt!"},
     {"key": "potion", "name": "Potion (+30 HP)", "price": 60, "icon": "/static/assets/items/potion.png", "desc": "Hồi phục 30 HP trong trận đấu."},
     {"key": "super_potion", "name": "Super Potion (+60 HP)", "price": 150, "icon": "/static/assets/items/super-potion.png", "desc": "Hồi phục 60 HP trong trận đấu."},
-    {"key": "rare_candy", "name": "Rare Candy (+1 Lv)", "price": 300, "icon": "/static/assets/items/rare-candy.png", "desc": "Dùng trực tiếp để tăng 1 cấp cho Pokémon."},
+    {"key": "rare_candy", "name": "Rare Candy (+1 Lv)", "price": 200, "icon": "/static/assets/items/rare-candy.png", "desc": "Dùng trực tiếp để tăng 1 cấp cho Pokémon."},
     {"key": "ticket", "name": "Gacha Ticket (×1)", "price": 220, "icon": "/static/assets/ui/ticket_gold.png", "desc": "Vé quay Gacha 1 lượt theo từng vùng Gen 1–9."},
     {"key": "ticket_x10", "name": "Royal Ticket (×10)", "price": 2100, "icon": "/static/assets/ui/ticket_x10.png", "desc": "Vé VIP quay ngay 10 lượt Gacha, đảm bảo Epic+!"},
 ]
