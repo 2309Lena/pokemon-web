@@ -39,7 +39,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             level INTEGER NOT NULL DEFAULT 1,
             xp INTEGER NOT NULL DEFAULT 0,
-            coins INTEGER NOT NULL DEFAULT 1500,
+            coins INTEGER NOT NULL DEFAULT 500,
             stardust INTEGER NOT NULL DEFAULT 100,
             open_points INTEGER NOT NULL DEFAULT 0,
             tickets INTEGER NOT NULL DEFAULT 12,
@@ -208,6 +208,20 @@ def init_db():
             FOREIGN KEY (post_id) REFERENCES forum_posts(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS pvp_invites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            room_id INTEGER NOT NULL,
+            room_code TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'pvp_3v3',
+            status TEXT NOT NULL DEFAULT 'pending',
+            expires_at REAL NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
     # Safe migration for existing SQLite databases missing new columns
@@ -283,7 +297,7 @@ def create_user(username, password, starter_species_id=25, starter_continent="As
         cur.execute(
             """
             INSERT INTO users (username, password_hash, level, xp, coins, stardust, open_points, created_at)
-            VALUES (?, ?, 1, 0, 1500, 100, 0, ?)
+            VALUES (?, ?, 1, 0, 500, 100, 0, ?)
             """,
             (username, generate_password_hash(password), now),
         )
@@ -478,7 +492,7 @@ def award_trainer_xp(user_id, xp_gain, coins_gain=0, stardust_gain=0):
         lvl += 1
         open_pts += 1
         leveled_up += 1
-        coins += 250
+        coins += 100
 
     conn.execute(
         """

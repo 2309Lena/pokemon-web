@@ -386,7 +386,7 @@
             <div class="salvage-rates-info">
               <img class="px-icon" src="/static/assets/ui/salvage.svg" alt="" />
               <strong>Tách Pokémon:</strong>
-              <span>Common <b>60 Coins</b> · Uncommon <b>120 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
+              <span>Common <b>25 Coins</b> · Uncommon <b>55 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
             </div>
             <div class="bulk-salvage-actions">
               <button class="btn-sm btn-gold" onclick="bulkSalvageTier('duplicates')">♻️ Tách hết trùng (mỗi loài giữ 1)</button>
@@ -577,6 +577,35 @@
       <div style="display:flex;gap:10px;margin-top:16px;">
         <button class="btn-primary" onclick="testSound()">🔊 Nghe Thử SFX</button>
         <button class="btn-green" onclick="closeSettings()">Lưu & Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIÊN QUÂN STYLE SOLO CHALLENGE INVITE POPUP -->
+  <div id="solo-invite-modal" class="solo-modal-backdrop hidden">
+    <div class="solo-arena-card">
+      <div class="solo-crest">⚔️ THÁCH ĐẤU SOLO!</div>
+      <div id="solo-mode-tag" class="badge" style="margin:6px auto;background:#2563eb;">PvP 3v3</div>
+      <div class="solo-vs-row">
+        <div class="solo-player-box challenger">
+          <div class="solo-avatar">🧢</div>
+          <strong id="solo-sender-name">Challenger</strong>
+          <small id="solo-sender-lvl" class="muted">Lv.1</small>
+        </div>
+        <div class="solo-vs-bolt">⚡ VS ⚡</div>
+        <div class="solo-player-box defender">
+          <div class="solo-avatar">🔥</div>
+          <strong id="solo-receiver-name">Bạn</strong>
+          <small id="solo-receiver-lvl" class="muted">Lv.1</small>
+        </div>
+      </div>
+      <div class="solo-timer-wrap">
+        <div class="solo-timer-bar"><div id="solo-timer-fill" class="solo-timer-fill"></div></div>
+        <small id="solo-timer-text" class="muted">Còn 30s để trả lời...</small>
+      </div>
+      <div class="solo-actions-row">
+        <button type="button" class="solo-btn-decline" onclick="respondSoloInvite('decline')">✕ TỪ CHỐI</button>
+        <button type="button" class="solo-btn-accept" onclick="respondSoloInvite('accept')">⚔️ CHẤP NHẬN</button>
       </div>
     </div>
   </div>

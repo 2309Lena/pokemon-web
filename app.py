@@ -35,9 +35,12 @@ from db import (
 )
 from friends_salvage import (
     SALVAGE_RATES,
+    create_pvp_invite,
     get_friends_overview,
+    poll_pvp_invites,
     remove_friend,
     respond_friend_request,
+    respond_pvp_invite,
     salvage_pokemon_list,
     search_users_for_friend,
     send_friend_request,
@@ -223,8 +226,8 @@ def api_daily(uid):
     conn.close()
     change_item_qty(uid, "poke_ball", 5)
     change_item_qty(uid, "great_ball", 2)
-    award_trainer_xp(uid, 40, coins_gain=400, stardust_gain=50)
-    return jsonify({"user": get_user_profile(uid), "message": "🎁 Nhận thưởng ngày: +400 Coins, +40 XP, +5 Poké Ball, +2 Great Ball!"})
+    award_trainer_xp(uid, 40, coins_gain=150, stardust_gain=50)
+    return jsonify({"user": get_user_profile(uid), "message": "🎁 Nhận thưởng ngày: +150 Coins, +40 XP, +5 Poké Ball, +2 Great Ball!"})
 
 
 POKEDEX_SPECIES_PAYLOAD = [
@@ -612,6 +615,40 @@ def api_friends_remove(uid):
     friend_id = int(data.get("friend_id", 0))
     remove_friend(uid, friend_id)
     return jsonify({"message": "Đã hủy kết bạn.", "overview": get_friends_overview(uid)})
+
+
+@app.route("/api/friends/invite", methods=["POST"])
+@login_required
+def api_friends_invite(uid):
+    touch_user_seen(uid)
+    data = request.get_json(silent=True) or {}
+    res, err = create_pvp_invite(
+        uid,
+        target_username=data.get("username"),
+        friend_id=data.get("friend_id"),
+        mode=data.get("mode", "pvp_3v3"),
+    )
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify(res)
+
+
+@app.route("/api/friends/invites/poll", methods=["GET"])
+@login_required
+def api_friends_invite_poll(uid):
+    touch_user_seen(uid)
+    return jsonify(poll_pvp_invites(uid))
+
+
+@app.route("/api/friends/invite/respond", methods=["POST"])
+@login_required
+def api_friends_invite_respond(uid):
+    touch_user_seen(uid)
+    data = request.get_json(silent=True) or {}
+    res, err = respond_pvp_invite(uid, data.get("invite_id", 0), data.get("action", "decline"))
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify(res)
 
 
 def _fetch_forum_posts(uid, category="all"):

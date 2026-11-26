@@ -281,12 +281,12 @@ ODDS_WEIGHTS = [
 ]
 
 DUP_COINS_BY_TIER = {
-    "Mythic": 400,
-    "Legendary": 250,
-    "Epic": 110,
-    "Rare": 65,
-    "Uncommon": 45,
-    "Common": 30,
+    "Mythic": 180,
+    "Legendary": 110,
+    "Epic": 50,
+    "Rare": 30,
+    "Uncommon": 18,
+    "Common": 10,
 }
 
 

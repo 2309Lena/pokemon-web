@@ -66,7 +66,7 @@ CUPS = {
         "desc": "Giải vô địch châu lục 4 vòng đấu đội hình 6 Pokémon!",
         "stages": 4,
         "base_level": 10,
-        "reward_coins": 900,
+        "reward_coins": 400,
         "reward_xp": 95,
     },
     "world_masters": {
@@ -75,7 +75,7 @@ CUPS = {
         "desc": "Đỉnh cao thế giới 5 vòng với đội hình 6 Pokémon mạnh nhất!",
         "stages": 5,
         "base_level": 20,
-        "reward_coins": 1600,
+        "reward_coins": 750,
         "reward_xp": 150,
     },
 }
@@ -316,13 +316,13 @@ def start_cup_battle(user_id, cup_id):
 
 def _finish_battle_win(user_id, state):
     mode = state["mode"]
-    coins = 120
+    coins = 45
     xp = 35
     poke_xp = 30
     extra_msg = ""
 
     if mode == "trainer":
-        coins = 280
+        coins = 110
         xp = 65
         poke_xp = 55
         if state["country_id"]:
@@ -336,7 +336,7 @@ def _finish_battle_win(user_id, state):
     elif mode == "cup":
         cup = CUPS[state["cup_id"]]
         stage = state["cup_stage"]
-        coins = cup["reward_coins"] // 2 + stage * 180
+        coins = cup["reward_coins"] // 2 + stage * 65
         xp = cup["reward_xp"] // 2 + stage * 25
         poke_xp = 80
         conn = get_conn()
@@ -503,12 +503,12 @@ def perform_battle_action(user_id, battle_id, action, param=None):
             )
             state["status"] = "caught"
             state["winner"] = "player"
-            trainer_res = award_trainer_xp(user_id, int(45 * bonuses["xp_mult"]), coins_gain=int(100 * bonuses["coin_mult"]))
+            trainer_res = award_trainer_xp(user_id, int(45 * bonuses["xp_mult"]), coins_gain=int(35 * bonuses["coin_mult"]))
             record_mission_event(user_id, "catch", 1)
             record_mission_event(user_id, "battle_win", 1)
             state["rewards"] = {
                 "caught_pokemon": added,
-                "coins": int(100 * bonuses["coin_mult"]),
+                "coins": int(35 * bonuses["coin_mult"]),
                 "trainer_xp": int(45 * bonuses["xp_mult"]),
                 "trainer": trainer_res,
             }

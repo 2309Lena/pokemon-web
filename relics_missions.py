@@ -85,7 +85,7 @@ MISSION_CATALOG = [
         "title": "Chiến thắng 3 trận đấu",
         "event": "battle_win",
         "target": 3,
-        "rewards": {"coins": 300, "tickets": 2, "xp": 35},
+        "rewards": {"coins": 110, "tickets": 2, "xp": 35},
     },
     {
         "id": "d_catch_2",
@@ -93,7 +93,7 @@ MISSION_CATALOG = [
         "title": "Bắt 2 Pokémon hoang dã",
         "event": "catch",
         "target": 2,
-        "rewards": {"coins": 250, "tickets": 2, "poke_ball": 4, "xp": 30},
+        "rewards": {"coins": 90, "tickets": 2, "poke_ball": 4, "xp": 30},
     },
     {
         "id": "d_pull_1",
@@ -101,7 +101,7 @@ MISSION_CATALOG = [
         "title": "Quay Gacha hoặc mở Pack 1 lần",
         "event": "gacha_pull",
         "target": 1,
-        "rewards": {"coins": 200, "tickets": 1, "xp": 25},
+        "rewards": {"coins": 75, "tickets": 1, "xp": 25},
     },
     # WEEKLY MISSIONS
     {
@@ -110,7 +110,7 @@ MISSION_CATALOG = [
         "title": "Thắng 15 trận trong tuần",
         "event": "battle_win",
         "target": 15,
-        "rewards": {"coins": 1200, "tickets_x10": 2, "xp": 120},
+        "rewards": {"coins": 450, "tickets_x10": 2, "xp": 120},
     },
     {
         "id": "w_catch_10",
@@ -118,7 +118,7 @@ MISSION_CATALOG = [
         "title": "Thu phục 10 Pokémon trong tuần",
         "event": "catch",
         "target": 10,
-        "rewards": {"coins": 1000, "tickets_x10": 1, "ultra_ball": 5, "xp": 100},
+        "rewards": {"coins": 380, "tickets_x10": 1, "ultra_ball": 5, "xp": 100},
     },
     {
         "id": "w_cup_3",
@@ -126,7 +126,7 @@ MISSION_CATALOG = [
         "title": "Thắng 3 trận Grand Cup hoặc PvP",
         "event": "cup_or_pvp_win",
         "target": 3,
-        "rewards": {"coins": 1500, "tickets_x10": 2, "rare_candy": 2, "xp": 150},
+        "rewards": {"coins": 550, "tickets_x10": 2, "rare_candy": 2, "xp": 150},
     },
     # MONTHLY MISSIONS
     {
@@ -135,7 +135,7 @@ MISSION_CATALOG = [
         "title": "Mở khóa 3 quốc gia mới trong tháng",
         "event": "country_unlock",
         "target": 3,
-        "rewards": {"coins": 3000, "tickets_x10": 4, "master_ball": 1, "xp": 250},
+        "rewards": {"coins": 1100, "tickets_x10": 4, "master_ball": 1, "xp": 250},
     },
     {
         "id": "m_pull_50",
@@ -143,7 +143,7 @@ MISSION_CATALOG = [
         "title": "Quay Gacha 50 lượt trong tháng",
         "event": "gacha_pull",
         "target": 50,
-        "rewards": {"coins": 3500, "tickets_x10": 5, "xp": 250},
+        "rewards": {"coins": 1250, "tickets_x10": 5, "xp": 250},
     },
     {
         "id": "m_champ_1",
@@ -151,7 +151,7 @@ MISSION_CATALOG = [
         "title": "Vô địch 1 giải Grand Cup (6v6)",
         "event": "cup_champ",
         "target": 1,
-        "rewards": {"coins": 4000, "tickets_x10": 5, "master_ball": 2, "xp": 350},
+        "rewards": {"coins": 1600, "tickets_x10": 5, "master_ball": 2, "xp": 350},
     },
 ]
 MISSION_BY_ID = {m["id"]: m for m in MISSION_CATALOG}

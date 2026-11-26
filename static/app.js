@@ -90,11 +90,15 @@ function pokeImgTag(id, shiny = false, cls = "poke-idle-anim", alt = "") {
 }
 
 function toast(msg, kind = "info") {
+  const box = document.getElementById("toast-container");
+  if (!box) return;
+  while (box.children.length >= 2) box.firstElementChild.remove();
+  const icon = kind === "error" ? "⚠️" : kind === "success" ? "✨" : "📢";
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
-  el.textContent = msg;
-  document.getElementById("toast-container").appendChild(el);
-  setTimeout(() => el.remove(), 3800);
+  el.textContent = `${icon} ${msg}`;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
 }
 
 async function api(url, opts = {}) {
@@ -232,6 +236,7 @@ async function enterApp() {
   renderRelics();
   renderMissions();
   loadPokedex();
+  startSoloInvitePolling();
 }
 
 function updateHUD() {
@@ -1326,8 +1331,8 @@ function renderTeamSlots(size, containerId) {
 }
 
 const SALVAGE_LABEL = {
-  Common: "60 Coins",
-  Uncommon: "120 Coins",
+  Common: "25 Coins",
+  Uncommon: "55 Coins",
   Rare: "3 Vé Thường",
   Epic: "5 Vé Thường",
   Legendary: "1 Vé Tím",
@@ -2522,20 +2527,103 @@ async function removeFriend(friendId, username) {
 
 async function inviteFriendRoom(friendName, mode) {
   try {
-    const data = await api("/api/online/create", {
+    const data = await api("/api/friends/invite", {
       method: "POST",
-      body: JSON.stringify({
-        title: `${currentUser.username} vs ${friendName}`,
-        mode,
-        max_slots: 2,
-      }),
+      body: JSON.stringify({ username: friendName, mode }),
     });
     currentOnlineRoom = data.room;
     switchTab("online");
     startOnlinePolling();
     renderOnlineRoomStage();
     refreshOnlineRooms();
-    toast(`Đã tạo phòng ${mode === "trade" ? "Trade" : "PvP"}! Mã phòng cho ${friendName}: ${data.room.code}`, "success");
+    toast(`⚔️ Đã gửi Pop-up Thách Đấu Solo tới ${friendName}! Đang chờ phản hồi...`, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+let activeSoloInvite = null;
+let soloInvitePollTimer = null;
+let soloCountdownTimer = null;
+
+function startSoloInvitePolling() {
+  clearInterval(soloInvitePollTimer);
+  soloInvitePollTimer = setInterval(async () => {
+    if (!currentUser) return;
+    try {
+      const data = await api("/api/friends/invites/poll");
+      if (data.declined_invite) {
+        toast(`${data.declined_invite.receiver_username} đã từ chối lời mời Solo.`, "error");
+      }
+      const inc = data.incoming_invite;
+      if (inc && (!activeSoloInvite || activeSoloInvite.invite_id !== inc.invite_id)) {
+        showSoloInviteModal(inc);
+      } else if (!inc && activeSoloInvite) {
+        hideSoloInviteModal();
+      }
+    } catch (_) {}
+  }, 2400);
+}
+
+function showSoloInviteModal(inv) {
+  activeSoloInvite = inv;
+  const modal = document.getElementById("solo-invite-modal");
+  if (!modal) return;
+  document.getElementById("solo-sender-name").textContent = inv.sender_username;
+  document.getElementById("solo-sender-lvl").textContent = `Lv.${inv.sender_level}`;
+  document.getElementById("solo-receiver-name").textContent = inv.receiver_username;
+  document.getElementById("solo-receiver-lvl").textContent = `Lv.${inv.receiver_level}`;
+  document.getElementById("solo-mode-tag").textContent =
+    inv.mode === "trade" ? "🤝 Giao Dịch Trade" : inv.mode === "pvp_6v6" ? "🏆 Đấu Trường Solo 6v6" : "⚔️ Đấu Trường Solo 3v3";
+  modal.classList.remove("hidden");
+  window.PokeAudio.playPackOpen();
+
+  let left = inv.seconds_left || 30;
+  const maxS = Math.max(left, 35);
+  clearInterval(soloCountdownTimer);
+  const updateBar = () => {
+    const fill = document.getElementById("solo-timer-fill");
+    const txt = document.getElementById("solo-timer-text");
+    if (fill) fill.style.width = `${Math.max(0, Math.round((left / maxS) * 100))}%`;
+    if (txt) txt.textContent = `Còn ${left}s để trả lời...`;
+  };
+  updateBar();
+  soloCountdownTimer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) {
+      hideSoloInviteModal();
+      return;
+    }
+    updateBar();
+  }, 1000);
+}
+
+function hideSoloInviteModal() {
+  activeSoloInvite = null;
+  clearInterval(soloCountdownTimer);
+  const modal = document.getElementById("solo-invite-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+async function respondSoloInvite(action) {
+  if (!activeSoloInvite) return;
+  const invId = activeSoloInvite.invite_id;
+  hideSoloInviteModal();
+  try {
+    const data = await api("/api/friends/invite/respond", {
+      method: "POST",
+      body: JSON.stringify({ invite_id: invId, action }),
+    });
+    if (action === "accept" && data.room) {
+      currentOnlineRoom = data.room;
+      switchTab("online");
+      startOnlinePolling();
+      renderOnlineRoomStage();
+      refreshOnlineRooms();
+      toast("⚔️ Đã vào phòng Solo! Nhấn Sẵn Sàng để bắt đầu ngay!", "success");
+    } else {
+      toast("Đã từ chối lời mời Solo.", "info");
+    }
   } catch (err) {
     toast(err.message, "error");
   }

@@ -311,9 +311,9 @@ def submit_pvp_action(user_id, room_id, action, param=0):
                 else:
                     st["status"] = "finished"
                     st["winner_user_id"] = int(atk_u)
-                    logs.append("🏆 Trận PvP kết thúc! Người thắng nhận +350 Coins & +60 XP!")
-                    award_trainer_xp(int(atk_u), 60, coins_gain=350)
-                    award_trainer_xp(int(def_u), 20, coins_gain=80)
+                    logs.append("🏆 Trận PvP kết thúc! Người thắng nhận +140 Coins & +60 XP!")
+                    award_trainer_xp(int(atk_u), 60, coins_gain=140)
+                    award_trainer_xp(int(def_u), 20, coins_gain=30)
 
         st["last_events"] = turn_events
         st["turn"] += 1

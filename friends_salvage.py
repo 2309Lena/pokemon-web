@@ -3,8 +3,8 @@ from db import get_conn
 from world_data import POKEMON_BY_ID
 
 SALVAGE_RATES = {
-    "Common": {"coins": 60, "tickets": 0, "tickets_x10": 0},
-    "Uncommon": {"coins": 120, "tickets": 0, "tickets_x10": 0},
+    "Common": {"coins": 25, "tickets": 0, "tickets_x10": 0},
+    "Uncommon": {"coins": 55, "tickets": 0, "tickets_x10": 0},
     "Rare": {"coins": 0, "tickets": 3, "tickets_x10": 0},
     "Epic": {"coins": 0, "tickets": 5, "tickets_x10": 0},
     "Legendary": {"coins": 0, "tickets": 0, "tickets_x10": 1},
@@ -263,6 +263,150 @@ def search_users_for_friend(user_id, query):
         )
     conn.close()
     return results
+
+
+def create_pvp_invite(sender_id, target_username=None, friend_id=None, mode="pvp_3v3"):
+    """Create a challenge room and dispatch a real-time 35s Solo invite to a friend."""
+    from online import create_room
+
+    if mode not in ("pvp_3v3", "pvp_6v6", "trade"):
+        mode = "pvp_3v3"
+    conn = get_conn()
+    sender = conn.execute("SELECT id, username FROM users WHERE id = ?", (sender_id,)).fetchone()
+    if friend_id:
+        recv = conn.execute("SELECT id, username FROM users WHERE id = ?", (int(friend_id),)).fetchone()
+    else:
+        recv = conn.execute(
+            "SELECT id, username FROM users WHERE LOWER(username) = LOWER(?)",
+            ((target_username or "").strip(),),
+        ).fetchone()
+    if not sender or not recv:
+        conn.close()
+        return None, "Không tìm thấy người chơi để mời Solo."
+    if recv["id"] == sender_id:
+        conn.close()
+        return None, "Không thể tự mời chính mình!"
+
+    now = time.time()
+    # Mark older pending invites between pair expired cleanly
+    conn.execute(
+        "UPDATE pvp_invites SET status = 'expired' WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'",
+        (sender_id, recv["id"]),
+    )
+    conn.commit()
+    conn.close()
+
+    title = f"⚔️ Solo: {sender['username']} vs {recv['username']}"
+    room, err = create_room(sender_id, title, mode=mode, max_slots=4)
+    if err:
+        return None, err
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO pvp_invites (sender_id, receiver_id, room_id, room_code, mode, status, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+        """,
+        (sender_id, recv["id"], room["id"], room["code"], mode, now + 35, now),
+    )
+    inv_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return {
+        "invite_id": inv_id,
+        "room": room,
+        "receiver_username": recv["username"],
+        "mode": mode,
+        "expires_in": 35,
+    }, None
+
+
+def poll_pvp_invites(user_id):
+    now = time.time()
+    conn = get_conn()
+    conn.execute("UPDATE pvp_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < ?", (now,))
+    conn.commit()
+
+    inc = conn.execute(
+        """
+        SELECT pi.*, su.username as sender_username, su.level as sender_level,
+               ru.username as receiver_username, ru.level as receiver_level
+        FROM pvp_invites pi
+        JOIN users su ON su.id = pi.sender_id
+        JOIN users ru ON ru.id = pi.receiver_id
+        WHERE pi.receiver_id = ? AND pi.status = 'pending' AND pi.expires_at >= ?
+        ORDER BY pi.id DESC LIMIT 1
+        """,
+        (user_id, now),
+    ).fetchone()
+
+    incoming_invite = None
+    if inc:
+        incoming_invite = {
+            "invite_id": inc["id"],
+            "sender_id": inc["sender_id"],
+            "sender_username": inc["sender_username"],
+            "sender_level": inc["sender_level"],
+            "receiver_username": inc["receiver_username"],
+            "receiver_level": inc["receiver_level"],
+            "room_id": inc["room_id"],
+            "room_code": inc["room_code"],
+            "mode": inc["mode"],
+            "seconds_left": max(1, int(inc["expires_at"] - now)),
+        }
+
+    # Check recently declined outgoing invite in last 8 seconds to notify challenger
+    recent_declined = conn.execute(
+        """
+        SELECT pi.id, ru.username as receiver_username
+        FROM pvp_invites pi
+        JOIN users ru ON ru.id = pi.receiver_id
+        WHERE pi.sender_id = ? AND pi.status = 'declined' AND pi.created_at >= ?
+        ORDER BY pi.id DESC LIMIT 1
+        """,
+        (user_id, now - 45),
+    ).fetchone()
+    declined_info = None
+    if recent_declined:
+        declined_info = {"invite_id": recent_declined["id"], "receiver_username": recent_declined["receiver_username"]}
+        conn.execute("UPDATE pvp_invites SET status = 'declined_seen' WHERE id = ?", (recent_declined["id"],))
+        conn.commit()
+
+    conn.close()
+    return {"incoming_invite": incoming_invite, "declined_invite": declined_info}
+
+
+def respond_pvp_invite(user_id, invite_id, action):
+    from online import join_room
+
+    conn = get_conn()
+    inv = conn.execute(
+        "SELECT * FROM pvp_invites WHERE id = ? AND receiver_id = ? AND status = 'pending'",
+        (int(invite_id), user_id),
+    ).fetchone()
+    if not inv:
+        conn.close()
+        return None, "Lời mời Solo đã hết hạn hoặc không còn tồn tại."
+    if time.time() > inv["expires_at"]:
+        conn.execute("UPDATE pvp_invites SET status = 'expired' WHERE id = ?", (inv["id"],))
+        conn.commit()
+        conn.close()
+        return None, "Lời mời Solo đã hết thời gian chờ!"
+
+    if action == "accept":
+        conn.execute("UPDATE pvp_invites SET status = 'accepted' WHERE id = ?", (inv["id"],))
+        conn.commit()
+        conn.close()
+        room, err = join_room(user_id, inv["room_id"])
+        if err:
+            return None, err
+        return {"status": "accepted", "room": room}, None
+
+    conn.execute("UPDATE pvp_invites SET status = 'declined' WHERE id = ?", (inv["id"],))
+    conn.commit()
+    conn.close()
+    return {"status": "declined"}, None
 
 
 def respond_friend_request(user_id, request_id, action):
