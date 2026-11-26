@@ -1823,23 +1823,65 @@ function renderPokedex() {
 }
 
 // ---------------- ONLINE PVP & TRADE ----------------
-async function refreshOnlineRooms() {
-  try {
-    const data = await api("/api/online/rooms");
-    document.getElementById("online-rooms-list").innerHTML = data.rooms.length
-      ? data.rooms
-          .map(
-            (r) => `
+let onlineRoomsCache = [];
+let onlineModeFilter = "all";
+
+function setOnlineModeFilter(mode) {
+  onlineModeFilter = mode;
+  renderOnlineRoomsList();
+}
+
+function renderOnlineRoomsList() {
+  const chipsEl = document.getElementById("online-mode-chips");
+  if (chipsEl) {
+    const modes = [
+      ["all", "Tất cả"],
+      ["pvp_3v3", "⚔️ PvP 3v3"],
+      ["pvp_6v6", "🏆 PvP 6v6"],
+      ["trade", "🤝 Trade"],
+    ];
+    chipsEl.innerHTML = modes
+      .map(([k, lbl]) => `<button type="button" class="pp-chip ${onlineModeFilter === k ? "active" : ""}" onclick="setOnlineModeFilter('${k}')">${lbl}</button>`)
+      .join("");
+  }
+
+  const q = (document.getElementById("online-room-search")?.value || "").trim().toLowerCase();
+  const filtered = (onlineRoomsCache || []).filter((r) => {
+    if (onlineModeFilter !== "all" && r.mode !== onlineModeFilter) return false;
+    if (
+      q &&
+      !r.title.toLowerCase().includes(q) &&
+      !r.code.toLowerCase().includes(q) &&
+      !r.host_username.toLowerCase().includes(q)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const listEl = document.getElementById("online-rooms-list");
+  if (!listEl) return;
+  listEl.innerHTML = filtered.length
+    ? filtered
+        .map(
+          (r) => `
           <div class="room-item">
             <div>
-              <strong>${r.title}</strong> <span class="badge">${r.mode}</span><br/>
-              <small class="muted">Mã: <strong>${r.code}</strong> · Host: ${r.host_username} · Chỗ: <strong>${r.occupied_slots}/${r.max_slots}</strong></small>
+              <strong>${escapeHtml(r.title)}</strong> <span class="badge">${r.mode}</span><br/>
+              <small class="muted">Mã: <strong>${r.code}</strong> · Host: ${escapeHtml(r.host_username)} · Chỗ: <strong>${r.occupied_slots}/${r.max_slots}</strong></small>
             </div>
             <button class="btn-primary btn-sm" onclick="joinOnlineRoom(${r.id})">Vào phòng</button>
           </div>`
-          )
-          .join("")
-      : `<div class="muted">Chưa có phòng nào đang mở. Hãy tạo phòng mới!</div>`;
+        )
+        .join("")
+    : `<div class="muted">Không có phòng nào phù hợp. Hãy tạo phòng mới!</div>`;
+}
+
+async function refreshOnlineRooms() {
+  try {
+    const data = await api("/api/online/rooms");
+    onlineRoomsCache = data.rooms || [];
+    renderOnlineRoomsList();
     if (currentOnlineRoom) {
       const detail = await api(`/api/online/rooms/${currentOnlineRoom.id}`);
       currentOnlineRoom = detail.room;
@@ -2168,12 +2210,86 @@ function renderFriends(data) {
             <div class="friend-actions">
               <button class="btn-sm btn-primary" onclick="inviteFriendRoom('${safeUser}', 'pvp_3v3')">⚔️ PvP 3v3</button>
               <button class="btn-sm btn-gold" onclick="inviteFriendRoom('${safeUser}', 'trade')">🤝 Trade</button>
-              <button class="btn-sm btn-danger" onclick="removeFriend(${f.id}, '${safeUser}')">Xóa</button>
+              <button class="btn-sm btn-danger" onclick="removeFriend(${f.user_id || f.id}, '${safeUser}')">Xóa</button>
             </div>
           </div>`;
           })
           .join("")
       : `<div class="muted">Bạn chưa có bạn bè nào. Hãy nhập tên Trainer ở trên để kết bạn!</div>`;
+  }
+}
+
+let friendSearchTimer = null;
+
+function onFriendSearchInput() {
+  const input = document.getElementById("friend-username-input");
+  const box = document.getElementById("friend-search-results");
+  const q = (input?.value || "").trim();
+  if (!box) return;
+  if (!q) {
+    box.classList.add("hidden");
+    box.innerHTML = "";
+    return;
+  }
+  clearTimeout(friendSearchTimer);
+  friendSearchTimer = setTimeout(async () => {
+    try {
+      const data = await api(`/api/friends/search?q=${encodeURIComponent(q)}`);
+      renderFriendSearchResults(data.users || [], q);
+    } catch (_) {}
+  }, 140);
+}
+
+function renderFriendSearchResults(users, query) {
+  const box = document.getElementById("friend-search-results");
+  if (!box) return;
+  if (!query) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  if (!users.length) {
+    box.innerHTML = `<div class="muted" style="padding:4px 6px;">Không tìm thấy Trainer "${escapeHtml(query)}"</div>`;
+    return;
+  }
+  box.innerHTML = users
+    .map((u) => {
+      const safeU = (u.username || "").replace(/'/g, "\\'");
+      let actionHtml = `<button type="button" class="btn-sm btn-gold" onclick="quickAddFriend('${safeU}')">+ Kết Bạn</button>`;
+      if (u.relation === "friend") {
+        actionHtml = `<button type="button" class="btn-sm btn-primary" onclick="inviteFriendRoom('${safeU}', 'pvp_3v3')">⚔️ Mời PvP</button>`;
+      } else if (u.relation === "outgoing") {
+        actionHtml = `<button type="button" class="btn-sm" disabled>⏳ Đã gửi</button>`;
+      } else if (u.relation === "incoming") {
+        actionHtml = `<button type="button" class="btn-sm btn-green" onclick="respondFriend(${u.request_id}, 'accept')">✓ Chấp Nhận</button>`;
+      }
+      return `
+        <div class="friend-search-item ${u.exact ? "exact" : ""}">
+          <div class="friend-meta">
+            <span class="online-dot ${u.online ? "online" : "offline"}"></span>
+            <div>
+              <strong>${escapeHtml(u.username)}</strong> <small class="badge">Lv.${u.level}</small>
+              ${u.exact ? `<span class="excl-badge">Khớp chính xác</span>` : ""}<br/>
+              <small class="muted">${u.online ? "🟢 Online" : "⚪ Offline"} · ${u.countries} vùng · ${u.pokedex} loài</small>
+            </div>
+          </div>
+          ${actionHtml}
+        </div>`;
+    })
+    .join("");
+}
+
+async function quickAddFriend(username) {
+  try {
+    const data = await api("/api/friends/request", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+    renderFriends(data.overview);
+    toast(data.message, "success");
+    onFriendSearchInput();
+  } catch (err) {
+    toast(err.message, "error");
   }
 }
 
@@ -2188,6 +2304,8 @@ async function sendFriendRequest(e) {
       body: JSON.stringify({ username }),
     });
     if (input) input.value = "";
+    const box = document.getElementById("friend-search-results");
+    if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
     renderFriends(data.overview);
     toast(data.message, "success");
   } catch (err) {

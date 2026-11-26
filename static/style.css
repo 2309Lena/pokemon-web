@@ -426,15 +426,17 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .slot-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
 
 /* Online */
-.online-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; }
+.online-layout { display: grid; grid-template-columns: 1fr 1.15fr; gap: 18px; }
 @media (max-width: 960px) { .online-layout { grid-template-columns: 1fr; } }
 .create-room-form { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; margin-bottom: 10px; }
-.join-code-row { display: flex; gap: 8px; margin-bottom: 14px; }
-.rooms-list { display: flex; flex-direction: column; gap: 10px; max-height: 460px; overflow-y: auto; }
+@media (max-width: 680px) { .create-room-form { grid-template-columns: 1fr 1fr; } }
+.join-code-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.rooms-list { display: flex; flex-direction: column; gap: 10px; max-height: 440px; overflow-y: auto; }
 .room-item {
-  background: #0d1526; border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  background: #1c2c6b; border: 2px solid #4159a3; border-radius: 10px; padding: 11px 13px;
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
 }
+.room-item:hover { border-color: var(--gold); }
 .trade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
 .trade-box { background: #0d1526; border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center; }
 
@@ -549,19 +551,25 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .bulk-salvage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .friend-add-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.friend-add-form input {
-  background: #0d1424;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 10px 12px;
-  border-radius: 8px;
-  min-width: 240px;
+.friend-search-wrap { position: relative; min-width: min(100%, 420px); flex: 1; max-width: 480px; }
+.friend-add-form .pp-search-input { min-width: 210px; flex: 1; }
+.friend-search-dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50;
+  background: #142052; border: 2px solid var(--gold); border-radius: 12px;
+  padding: 8px; display: flex; flex-direction: column; gap: 6px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.65); max-height: 320px; overflow-y: auto;
 }
+.friend-search-item {
+  background: #1c2c6b; border: 1.5px solid #4159a3; border-radius: 9px;
+  padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.friend-search-item.exact { border-color: var(--gold); background: #233580; }
+.pp-search-input:focus, .pp-select:focus { outline: none; border-color: var(--gold); }
 .friends-layout { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 16px; }
 @media (max-width: 900px) { .friends-layout { grid-template-columns: 1fr; } }
 .friends-box {
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: #142052;
+  border: 2px solid #4861ad;
   border-radius: 14px;
   padding: 16px;
 }

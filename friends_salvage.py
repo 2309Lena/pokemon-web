@@ -202,6 +202,69 @@ def send_friend_request(user_id, target_username):
     return {"status": "pending", "username": target["username"]}, None
 
 
+def search_users_for_friend(user_id, query):
+    q = (query or "").strip()
+    if not q:
+        return []
+    now = time.time()
+    conn = get_conn()
+    like_sub = f"%{q.lower()}%"
+    like_pre = f"{q.lower()}%"
+    rows = conn.execute(
+        """
+        SELECT u.id, u.username, u.level, u.last_seen,
+               (SELECT COUNT(*) FROM unlocked_countries uc WHERE uc.user_id = u.id) as countries_cnt,
+               (SELECT COUNT(*) FROM pokedex px WHERE px.user_id = u.id AND px.caught = 1) as dex_cnt
+        FROM users u
+        WHERE u.id != ? AND LOWER(u.username) LIKE ?
+        ORDER BY
+            CASE WHEN LOWER(u.username) = LOWER(?) THEN 0
+                 WHEN LOWER(u.username) LIKE ? THEN 1
+                 ELSE 2 END,
+            u.last_seen DESC,
+            u.username ASC
+        LIMIT 8
+        """,
+        (user_id, like_sub, q, like_pre),
+    ).fetchall()
+
+    results = []
+    for r in rows:
+        rel_row = conn.execute(
+            """
+            SELECT id, requester_id, addressee_id, status
+            FROM friendships
+            WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)
+            """,
+            (user_id, r["id"], r["id"], user_id),
+        ).fetchone()
+        relation = "none"
+        req_id = None
+        if rel_row:
+            req_id = rel_row["id"]
+            if rel_row["status"] == "accepted":
+                relation = "friend"
+            elif rel_row["requester_id"] == user_id:
+                relation = "outgoing"
+            else:
+                relation = "incoming"
+        results.append(
+            {
+                "user_id": r["id"],
+                "username": r["username"],
+                "level": r["level"],
+                "online": (now - (r["last_seen"] or 0)) < 120,
+                "countries": r["countries_cnt"],
+                "pokedex": r["dex_cnt"],
+                "exact": r["username"].lower() == q.lower(),
+                "relation": relation,
+                "request_id": req_id,
+            }
+        )
+    conn.close()
+    return results
+
+
 def respond_friend_request(user_id, request_id, action):
     conn = get_conn()
     row = conn.execute(

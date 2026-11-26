@@ -39,6 +39,7 @@ from friends_salvage import (
     remove_friend,
     respond_friend_request,
     salvage_pokemon_list,
+    search_users_for_friend,
     send_friend_request,
 )
 from online import (
@@ -563,6 +564,14 @@ def api_pokemon_salvage(uid):
 def api_friends_list(uid):
     touch_user_seen(uid)
     return jsonify(get_friends_overview(uid))
+
+
+@app.route("/api/friends/search", methods=["GET"])
+@login_required
+def api_friends_search(uid):
+    touch_user_seen(uid)
+    q = request.args.get("q", "")
+    return jsonify({"users": search_users_for_friend(uid, q)})
 
 
 @app.route("/api/friends/request", methods=["POST"])

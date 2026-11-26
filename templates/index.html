@@ -448,19 +448,19 @@
       <!-- 7. ONLINE PVP & TRADE TAB -->
       <section id="panel-online" class="tab-panel">
         <div class="online-layout">
-          <div class="online-lobby-card">
+          <div class="online-lobby-card pp-console">
             <div class="panel-header-row">
               <h3>🌐 Sảnh Online — PvP & Giao Dịch</h3>
               <button class="btn-sm" onclick="refreshOnlineRooms()">🔄 Làm mới</button>
             </div>
             <form class="create-room-form" onsubmit="createOnlineRoom(event)">
-              <input id="room-title" type="text" placeholder="Tên phòng (vd: Giao lưu 3v3)" required />
-              <select id="room-mode">
+              <input id="room-title" class="pp-search-input" type="text" placeholder="Tên phòng (vd: Giao lưu 3v3)" required />
+              <select id="room-mode" class="pp-select">
                 <option value="pvp_3v3">⚔️ PvP 3v3</option>
                 <option value="pvp_6v6">🏆 PvP 6v6 (Grand)</option>
                 <option value="trade">🤝 Trade Pokémon</option>
               </select>
-              <select id="room-slots" title="Số chỗ tối đa trong phòng">
+              <select id="room-slots" class="pp-select" title="Số chỗ tối đa trong phòng">
                 <option value="2">2 chỗ</option>
                 <option value="4">4 chỗ (kèm khán giả)</option>
                 <option value="6">6 chỗ</option>
@@ -469,14 +469,19 @@
             </form>
 
             <div class="join-code-row">
-              <input id="join-code-input" type="text" placeholder="Nhập mã phòng 6 ký tự..." />
+              <input id="join-code-input" class="pp-search-input" type="text" placeholder="Nhập mã phòng 6 ký tự..." />
               <button class="btn-gold" onclick="joinByCode()">Vào bằng mã</button>
             </div>
+
+            <div class="pp-search-row" style="margin-top:6px;">
+              <input id="online-room-search" class="pp-search-input" type="text" placeholder="Search room by name, code, or host..." oninput="renderOnlineRoomsList()" />
+            </div>
+            <div class="pp-chip-row" id="online-mode-chips"></div>
 
             <div id="online-rooms-list" class="rooms-list"></div>
           </div>
 
-          <div class="online-room-stage" id="online-room-stage">
+          <div class="online-room-stage pp-console" id="online-room-stage">
             <div class="empty-hint">Tạo hoặc tham gia một phòng để đấu PvP (3v3 / 6v6) hoặc Trao đổi Pokémon với người chơi khác!</div>
           </div>
         </div>
@@ -484,15 +489,18 @@
 
       <!-- 10. FRIENDS TAB -->
       <section id="panel-friends" class="tab-panel">
-        <div class="panel-header">
+        <div class="panel-header" style="align-items:flex-start;">
           <div>
             <h2><img class="px-icon" src="/static/assets/ui/friends.svg" alt="" /> Danh Sách Bạn Bè</h2>
-            <p class="muted">Kết bạn bằng tên Trainer, xem trạng thái Online và tạo nhanh phòng PvP / Trade cùng bạn bè.</p>
+            <p class="muted">Nhập tên Trainer bên dưới — hệ thống tự động hiện kết quả ngay dưới thanh tìm kiếm để bấm Kết Bạn!</p>
           </div>
-          <form class="friend-add-form" onsubmit="sendFriendRequest(event)">
-            <input id="friend-username-input" type="text" placeholder="Nhập tên Trainer muốn kết bạn..." required />
-            <button type="submit" class="btn-primary">+ Gửi Lời Mời</button>
-          </form>
+          <div class="friend-search-wrap">
+            <form class="friend-add-form" onsubmit="sendFriendRequest(event)">
+              <input id="friend-username-input" class="pp-search-input" type="text" autocomplete="off" placeholder="Search Trainer name to add friend..." oninput="onFriendSearchInput()" required />
+              <button type="submit" class="btn-gold">+ Kết Bạn</button>
+            </form>
+            <div id="friend-search-results" class="friend-search-dropdown hidden"></div>
+          </div>
         </div>
 
         <div class="friends-layout">
