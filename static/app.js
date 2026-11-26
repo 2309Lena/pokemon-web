@@ -125,11 +125,88 @@ function askConfirm(message, title = "⚠️ Xác Nhận Thao Tác", okLabel = "
   });
 }
 
+const CLIENT_APP_VERSION =
+  (document.querySelector('meta[name="app-version"]') &&
+    document.querySelector('meta[name="app-version"]').getAttribute("content")) ||
+  "";
+let isForceReloading = false;
+let versionPollTimer = null;
+
+function stripUpdateParamIfPresent() {
+  try {
+    const u = new URL(window.location.href);
+    if (u.searchParams.has("_v")) {
+      u.searchParams.delete("_v");
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    }
+  } catch (_) {}
+}
+
+function triggerForceUpdateReload(newVer) {
+  if (!newVer || !CLIENT_APP_VERSION || newVer === CLIENT_APP_VERSION || isForceReloading) return;
+  try {
+    const last = JSON.parse(sessionStorage.getItem("pokeworld_reloading_ver") || "null");
+    if (last && last.ver === newVer && Date.now() - last.ts < 12000) return;
+    sessionStorage.setItem("pokeworld_reloading_ver", JSON.stringify({ ver: newVer, ts: Date.now() }));
+  } catch (_) {}
+
+  isForceReloading = true;
+  clearInterval(versionPollTimer);
+  const modal = document.getElementById("force-update-modal");
+  const msgEl = document.getElementById("force-update-msg");
+  if (msgEl) {
+    msgEl.textContent = "Server vừa cập nhật bản mới! Đang tự động tải lại để áp dụng ngay...";
+  }
+  if (modal) modal.classList.remove("hidden");
+
+  setTimeout(() => {
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set("_v", Date.now().toString());
+      window.location.replace(u.toString());
+    } catch (_) {
+      window.location.reload();
+    }
+  }, 1400);
+}
+
+async function checkAppVersion() {
+  if (!CLIENT_APP_VERSION || isForceReloading) return;
+  try {
+    const res = await fetch(`/api/version?t=${Date.now()}`, { cache: "no-store" });
+    const headerVer = res.headers.get("X-App-Version");
+    if (headerVer && headerVer !== CLIENT_APP_VERSION) {
+      triggerForceUpdateReload(headerVer);
+      return;
+    }
+    if (res.ok) {
+      const data = await res.json();
+      if (data.version && data.version !== CLIENT_APP_VERSION) {
+        triggerForceUpdateReload(data.version);
+      }
+    }
+  } catch (_) {}
+}
+
+function startVersionWatcher() {
+  stripUpdateParamIfPresent();
+  clearInterval(versionPollTimer);
+  versionPollTimer = setInterval(checkAppVersion, 12000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkAppVersion();
+  });
+  window.addEventListener("focus", checkAppVersion);
+}
+
 async function api(url, opts = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
+  const serverVer = res.headers.get("X-App-Version");
+  if (serverVer && CLIENT_APP_VERSION && serverVer !== CLIENT_APP_VERSION) {
+    triggerForceUpdateReload(serverVer);
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Có lỗi xảy ra");
   return data;
@@ -241,6 +318,7 @@ async function logout() {
 
 // ---------------- INIT & HUD ----------------
 async function bootstrap() {
+  startVersionWatcher();
   renderStarters();
   try {
     const me = await api("/api/me");

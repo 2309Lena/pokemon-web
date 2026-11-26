@@ -106,22 +106,55 @@ app.secret_key = _get_secret_key()
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
+_VER_CACHE = {"ts": 0.0, "val": "1"}
+
+
 def _compute_asset_ver():
     base = os.path.dirname(os.path.abspath(__file__))
-    mtimes = []
-    for rel in ("static/style.css", "static/vfx.js", "static/app.js"):
+    watched = (
+        "app.py",
+        "battle.py",
+        "relics_missions.py",
+        "world_data.py",
+        "moves_catalog.py",
+        "db.py",
+        "templates/index.html",
+        "static/style.css",
+        "static/vfx.js",
+        "static/app.js",
+    )
+    h = hashlib.md5()
+    max_mt = 0
+    for rel in watched:
         p = os.path.join(base, rel)
         if os.path.exists(p):
-            mtimes.append(int(os.path.getmtime(p)))
-    return str(max(mtimes) if mtimes else 1)
+            st = os.stat(p)
+            mt = int(st.st_mtime)
+            if mt > max_mt:
+                max_mt = mt
+            h.update(f"{rel}:{mt}:{st.st_size};".encode())
+    return f"{max_mt}-{h.hexdigest()[:8]}"
 
 
-ASSET_VER = _compute_asset_ver()
+def get_app_ver():
+    now = time.time()
+    if now - _VER_CACHE["ts"] > 2.0:
+        _VER_CACHE["val"] = _compute_asset_ver()
+        _VER_CACHE["ts"] = now
+    return _VER_CACHE["val"]
+
+
+ASSET_VER = get_app_ver()
 
 
 @app.after_request
 def optimize_response(resp):
-    if request.path.startswith("/static/assets/") and resp.status_code == 200:
+    ver = get_app_ver()
+    if request.path == "/" or request.path.startswith("/api/"):
+        resp.headers["X-App-Version"] = ver
+    if request.path in ("/", "/api/version"):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    elif request.path.startswith("/static/assets/") and resp.status_code == 200:
         resp.headers["Cache-Control"] = "public, max-age=86400"
     elif request.path.startswith("/static/") and resp.status_code == 200:
         resp.headers["Cache-Control"] = "no-cache, must-revalidate"
@@ -168,7 +201,12 @@ def login_required(fn):
 
 @app.route("/")
 def index():
-    return render_template("index.html", asset_v=ASSET_VER)
+    return render_template("index.html", asset_v=get_app_ver())
+
+
+@app.route("/api/version")
+def api_version():
+    return jsonify({"version": get_app_ver()})
 
 
 @app.route("/api/register", methods=["POST"])

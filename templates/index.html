@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="app-version" content="{{ asset_v }}" />
   <title>PokéWorld Atlas — Gen 1–9 RPG & TCG</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -627,6 +628,14 @@
         <button type="button" id="confirm-modal-cancel" class="btn-sm" style="padding:10px 14px;">✕ Huỷ</button>
         <button type="button" id="confirm-modal-ok" class="btn-gold btn-sm" style="padding:10px 14px;">✓ Xác Nhận</button>
       </div>
+    </div>
+  </div>
+
+  <!-- FORCE AUTO-RELOAD UPDATE OVERLAY -->
+  <div id="force-update-modal" class="modal-backdrop hidden" style="z-index:9900;">
+    <div class="modal-card confirm-game-card update-reload-card">
+      <div class="confirm-game-title">🚀 Có Phiên Bản Mới!</div>
+      <p id="force-update-msg" class="confirm-game-msg">Server vừa cập nhật tính năng mới. Game sẽ tự động tải lại sau 2 giây...</p>
     </div>
   </div>
 
