@@ -11,6 +11,7 @@ from world_data import (
     POKEMON_BY_ID,
     pick_starter_country,
 )
+from moves_catalog import build_moves_for_species
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("POKEMON_DB_PATH") or os.path.join(BASE_DIR, "pokemon_world.db")
@@ -275,6 +276,7 @@ def serialize_user_pokemon(row):
     d["legendary"] = sp["legendary"]
     d["mythical"] = sp["mythical"]
     d["stats"] = stats
+    d["moves"] = build_moves_for_species(d["species_id"], POKEMON_BY_ID)
     d["xp_needed"] = pokemon_xp_needed(d["level"])
     d["can_evolve"] = bool(EVOLUTIONS_FORWARD.get(d["species_id"])) and d["level"] >= 12
     d["evolves_to"] = EVOLUTIONS_FORWARD.get(d["species_id"], [])

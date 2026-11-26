@@ -15,6 +15,7 @@ from db import (
 )
 from relics_missions import get_relic_bonuses, record_mission_event
 from world_data import COUNTRIES_BY_ID, POKEMON_BY_ID, POKEMON_LIST, get_country_encounter
+from moves_catalog import build_moves_for_species as _build_species_moves
 
 # 18-Type Effectiveness Chart (only non-1.0 multipliers stored)
 TYPE_CHART = {
@@ -90,19 +91,7 @@ def type_multiplier(move_type, def_types):
 
 
 def build_moves_for_species(species_id):
-    sp = POKEMON_BY_ID.get(species_id, POKEMON_BY_ID[25])
-    types = sp["types"]
-    moves = []
-    # 2 moves from primary type
-    for name, power in TYPE_MOVES.get(types[0], TYPE_MOVES["normal"]):
-        moves.append({"name": name, "type": types[0], "power": power, "acc": 95})
-    # 1 move from secondary type or normal
-    sec = types[1] if len(types) > 1 else ("dark" if types[0] != "dark" else "normal")
-    sec_name, sec_pow = TYPE_MOVES.get(sec, TYPE_MOVES["normal"])[0]
-    moves.append({"name": sec_name, "type": sec, "power": sec_pow, "acc": 95})
-    # 4th universal tactical strike
-    moves.append({"name": "Quick Strike", "type": "normal", "power": 50, "acc": 100})
-    return moves
+    return _build_species_moves(species_id, POKEMON_BY_ID)
 
 
 def fighter_from_user_pokemon(up, bonuses=None):
@@ -152,13 +141,33 @@ def fighter_from_wild(species_id, level, is_shiny=False, is_exclusive=False):
 
 
 def calc_damage(attacker, defender, move):
-    stab = 1.35 if move["type"] in attacker["types"] else 1.0
     eff = type_multiplier(move["type"], defender["types"])
-    crit = 1.5 if random.random() < 0.08 else 1.0
-    rand = random.uniform(0.88, 1.04)
-    raw = (((2 * attacker["level"] / 5 + 2) * move["power"] * (attacker["atk"] / max(1, defender["def"]))) / 45 + 2)
-    dmg = int(max(1, raw * stab * eff * crit * rand)) if eff > 0 else 0
-    return dmg, eff, crit > 1.0
+    if eff == 0:
+        return 0, 0.0, False
+
+    is_stab = move["type"] in attacker["types"]
+    stab = 1.28 if is_stab else 1.0
+
+    # Distinct scaling when hitting Neutral (Không khắc) vs Super-Effective (Khắc hệ) vs Resisted (Kháng hệ)
+    crit_chance = float(move.get("crit_bonus", 0.08))
+    if eff >= 4.0:
+        eff_mult = 3.6  # Double-weakness massive burst
+        crit_chance += 0.10
+    elif eff >= 2.0:
+        eff_mult = 2.15  # Distinct boosted weakness exploit vs neutral
+        crit_chance += 0.06
+    elif eff < 1.0:
+        eff_mult = 0.55 if eff >= 0.5 else 0.30
+    else:
+        eff_mult = 1.0
+
+    crit = random.random() < crit_chance
+    crit_mult = 1.55 if crit else 1.0
+    rand = random.uniform(0.90, 1.04)
+
+    raw = (((2 * attacker["level"] / 5 + 2) * move["power"] * (attacker["atk"] / max(1, defender["def"]))) / 42 + 2)
+    dmg = int(max(1, raw * stab * eff_mult * crit_mult * rand))
+    return dmg, eff, crit
 
 
 def _save_battle(battle_id, user_id, mode, state):
@@ -425,7 +434,13 @@ def perform_battle_action(user_id, battle_id, action, param=None):
         emove = random.choice(e["moves"])
         dmg, eff, crit = calc_damage(e, p, emove)
         p["hp"] = max(0, p["hp"] - dmg)
-        eff_txt = " (Siêu hiệu quả!)" if eff >= 2 else (" (Ít hiệu quả)" if 0 < eff < 1 else (" (Không tác dụng!)" if eff == 0 else ""))
+        eff_txt = (
+            " 💥 [SIÊU KHẮC ×4!]" if eff >= 4 else
+            " 🔥 [KHẮC HỆ ×2!]" if eff >= 2 else
+            " 🚫 [VÔ HIỆU ×0]" if eff == 0 else
+            " 🛡️ [Kháng ×0.5]" if 0 < eff < 1 else
+            " ⚔️ [Thường ×1]"
+        )
         crit_txt = " Chí mạng!" if crit else ""
         logs.append(f"{e['name']} dùng {emove['name']} gây {dmg} sát thương!{eff_txt}{crit_txt}")
         events.append({"actor": "enemy", "type": "attack", "move": emove, "dmg": dmg, "eff": eff, "crit": crit})
@@ -527,7 +542,13 @@ def perform_battle_action(user_id, battle_id, action, param=None):
             nonlocal e
             dmg, eff, crit = calc_damage(p, e, pmove)
             e["hp"] = max(0, e["hp"] - dmg)
-            eff_txt = " (Siêu hiệu quả!)" if eff >= 2 else (" (Ít hiệu quả)" if 0 < eff < 1 else (" (Không tác dụng!)" if eff == 0 else ""))
+            eff_txt = (
+            " 💥 [SIÊU KHẮC ×4!]" if eff >= 4 else
+            " 🔥 [KHẮC HỆ ×2!]" if eff >= 2 else
+            " 🚫 [VÔ HIỆU ×0]" if eff == 0 else
+            " 🛡️ [Kháng ×0.5]" if 0 < eff < 1 else
+            " ⚔️ [Thường ×1]"
+        )
             crit_txt = " Chí mạng!" if crit else ""
             logs.append(f"{p['name']} dùng {pmove['name']} gây {dmg} sát thương!{eff_txt}{crit_txt}")
             events.append({"actor": "player", "type": "attack", "move": pmove, "dmg": dmg, "eff": eff, "crit": crit})

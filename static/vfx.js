@@ -298,15 +298,31 @@ class BattleVFXRenderer {
           }
           if (a.dmg !== undefined) {
             let tag = `-${a.dmg}`;
-            if (a.crit) tag = `CRIT! ${tag}`;
-            else if (a.eff >= 2) tag = `SUPER! ${tag}`;
+            let col = "#ffffff";
+            if (a.eff === 0) {
+              tag = "VÔ HIỆU 0!";
+              col = "#94a3b8";
+            } else if (a.eff >= 4) {
+              tag = `KHẮC ×4! ${tag}`;
+              col = "#facc15";
+            } else if (a.eff >= 2) {
+              tag = `KHẮC ×2! ${tag}`;
+              col = "#4ade80";
+            } else if (a.eff < 1) {
+              tag = `KHÁNG ${tag}`;
+              col = "#93c5fd";
+            }
+            if (a.crit && a.eff > 0) {
+              tag = `CRIT! ${tag}`;
+              col = "#facc15";
+            }
             this.popups.push({
               x: a.ex,
               y: a.ey - 28,
               vy: -1.6,
               alpha: 1.0,
               text: tag,
-              color: a.crit ? "#facc15" : a.eff >= 2 ? "#4ade80" : "#ffffff",
+              color: col,
             });
           }
         }

@@ -293,6 +293,13 @@ def submit_pvp_action(user_id, room_id, action, param=0):
             mv = atk_f["moves"][midx]
             dmg, eff, crit = calc_damage(atk_f, def_f, mv)
             def_f["hp"] = max(0, def_f["hp"] - dmg)
+            eff_tag = (
+                " 💥 [SIÊU KHẮC ×4!]" if eff >= 4 else
+                " 🔥 [KHẮC HỆ ×2!]" if eff >= 2 else
+                " 🚫 [VÔ HIỆU ×0]" if eff == 0 else
+                " 🛡️ [Kháng ×0.5]" if eff < 1 else
+                " ⚔️ [Thường ×1]"
+            )
             turn_events.append({
                 "actor_user_id": int(atk_u),
                 "target_user_id": int(def_u),
@@ -301,7 +308,7 @@ def submit_pvp_action(user_id, room_id, action, param=0):
                 "eff": eff,
                 "crit": crit,
             })
-            logs.append(f"{atk_f['name']} dùng {mv['name']} gây {dmg} sát thương!")
+            logs.append(f"{atk_f['name']} dùng {mv['name']} gây {dmg} sát thương!{eff_tag}{' Chí mạng!' if crit else ''}")
             if def_f["hp"] <= 0:
                 logs.append(f"{def_f['name']} gục ngã!")
                 nxt = next((i for i, x in enumerate(st["teams"][def_u]) if x["hp"] > 0), None)

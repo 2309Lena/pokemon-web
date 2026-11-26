@@ -812,18 +812,65 @@ function renderBattle() {
 
   const ongoing = s.status === "ongoing";
 
-  // Moves
+const CLIENT_TYPE_CHART = {
+  normal: { rock: 0.5, ghost: 0.0, steel: 0.5 },
+  fire: { fire: 0.5, water: 0.5, grass: 2.0, ice: 2.0, bug: 2.0, rock: 0.5, dragon: 0.5, steel: 2.0 },
+  water: { fire: 2.0, water: 0.5, grass: 0.5, ground: 2.0, rock: 2.0, dragon: 0.5 },
+  electric: { water: 2.0, electric: 0.5, grass: 0.5, ground: 0.0, flying: 2.0, dragon: 0.5 },
+  grass: { fire: 0.5, water: 2.0, grass: 0.5, poison: 0.5, ground: 2.0, flying: 0.5, bug: 0.5, rock: 2.0, dragon: 0.5, steel: 0.5 },
+  ice: { fire: 0.5, water: 0.5, grass: 2.0, ice: 0.5, ground: 2.0, flying: 2.0, dragon: 2.0, steel: 0.5 },
+  fighting: { normal: 2.0, ice: 2.0, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2.0, ghost: 0.0, dark: 2.0, steel: 2.0, fairy: 0.5 },
+  poison: { grass: 2.0, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0.0, fairy: 2.0 },
+  ground: { fire: 2.0, electric: 2.0, grass: 0.5, poison: 2.0, flying: 0.0, bug: 0.5, rock: 2.0, steel: 2.0 },
+  flying: { electric: 0.5, grass: 2.0, fighting: 2.0, bug: 2.0, rock: 0.5, steel: 0.5 },
+  psychic: { fighting: 2.0, poison: 2.0, psychic: 0.5, dark: 0.0, steel: 0.5 },
+  bug: { fire: 0.5, grass: 2.0, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2.0, ghost: 0.5, dark: 2.0, steel: 0.5, fairy: 0.5 },
+  rock: { fire: 2.0, ice: 2.0, fighting: 0.5, ground: 0.5, flying: 2.0, bug: 2.0, steel: 0.5 },
+  ghost: { normal: 0.0, psychic: 2.0, ghost: 2.0, dark: 0.5 },
+  dragon: { dragon: 2.0, steel: 0.5, fairy: 0.0 },
+  dark: { fighting: 0.5, psychic: 2.0, ghost: 2.0, dark: 0.5, fairy: 0.5 },
+  steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2.0, rock: 2.0, steel: 0.5, fairy: 2.0 },
+  fairy: { fire: 0.5, fighting: 2.0, poison: 0.5, dragon: 2.0, dark: 2.0, steel: 0.5 },
+};
+
+function movePreviewMeta(attacker, defender, m) {
+  const chart = CLIENT_TYPE_CHART[m.type] || {};
+  let eff = 1.0;
+  for (const dt of defender?.types || []) eff *= chart[dt] ?? 1.0;
+  let badge = `<span style="color:#cbd5e1;">⚔️ ×1 Thường</span>`;
+  let effMult = 1.0;
+  if (eff === 0) {
+    badge = `<span style="color:#f87171;">🚫 Vô hiệu</span>`;
+    effMult = 0;
+  } else if (eff >= 4) {
+    badge = `<span style="color:#facc15;font-weight:800;">💥 ×4 KHẮC</span>`;
+    effMult = 3.6;
+  } else if (eff >= 2) {
+    badge = `<span style="color:#4ade80;font-weight:800;">🔥 ×2 KHẮC</span>`;
+    effMult = 2.15;
+  } else if (eff < 1) {
+    badge = `<span style="color:#93c5fd;">🛡️ ×${eff} Kháng</span>`;
+    effMult = eff >= 0.5 ? 0.55 : 0.3;
+  }
+  const stab = (attacker?.types || []).includes(m.type) ? 1.28 : 1.0;
+  const raw = (((2 * (attacker?.level || 1)) / 5 + 2) * (m.power || 50) * ((attacker?.atk || 10) / Math.max(1, defender?.def || 10))) / 42 + 2;
+  const est = eff === 0 ? 0 : Math.max(1, Math.round(raw * stab * effMult));
+  return { badge, est };
+}
+
+  // Moves with live STAB, Khắc / Không khắc effectiveness & estimated damage!
   document.getElementById("battle-moves").innerHTML = p.moves
-    .map(
-      (m, idx) => `
+    .map((m, idx) => {
+      const pv = movePreviewMeta(p, e, m);
+      return `
       <button class="move-btn" ${ongoing ? "" : "disabled"} onclick="sendBattleAction('move', ${idx})">
         <div>
-          <strong>${m.name}</strong><br />
-          <small class="muted">Power ${m.power}</small>
+          <strong>${m.name}</strong> ${m.role === "Signature" ? `<span class="excl-badge">★</span>` : ""}<br />
+          <small class="muted">Pow ${m.power} · ~${pv.est} DMG · ${pv.badge}</small>
         </div>
         <span class="type-badge t-${m.type}">${m.type}</span>
-      </button>`
-    )
+      </button>`;
+    })
     .join("");
 
   // Items & Catch with Pixel Ball & Potion Sprites
@@ -1593,6 +1640,24 @@ function renderMyPokemon() {
       ${_statBarRow("Defense", sel.stats.def, 160, "#fb7185")}
       ${_statBarRow("Speed", sel.stats.spd, 160, "#4ade80")}
     </div>
+    ${
+      (sel.moves || []).length
+        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;">
+            ${sel.moves
+              .map(
+                (m) => `
+                <div style="background:#19265c;border:1.5px solid #4159a3;border-radius:7px;padding:4px 7px;font-size:0.74rem;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
+                    <strong>${m.name}</strong>
+                    <span class="type-badge t-${m.type}" style="font-size:0.62rem;padding:1px 5px;">${m.type}</span>
+                  </div>
+                  <small class="muted">Pow ${m.power}${m.role ? ` · ${m.role}` : ""}</small>
+                </div>`
+              )
+              .join("")}
+          </div>`
+        : ""
+    }
     <div class="pp-insp-actions">
       <button class="btn-sm" onclick="quickAssign(${sel.id}, 3)">+Đội 3</button>
       <button class="btn-sm" onclick="quickAssign(${sel.id}, 6)">+Đội 6</button>
@@ -2229,16 +2294,17 @@ function renderOnlineRoomStage() {
             <h4>Chiêu thức (Lượt ${st.turn}) ${myActSubmitted ? `<span class="badge" style="background:#0284c7;">⏳ Đã chọn — Đang chờ ${escapeHtml(rightPlayer.username)}...</span>` : ""}</h4>
             <div class="moves-grid">
               ${leftMon.moves
-                .map(
-                  (m, idx) => `
+                .map((m, idx) => {
+                  const pv = movePreviewMeta(leftMon, rightMon, m);
+                  return `
                   <button class="move-btn" ${myActSubmitted ? "disabled" : `onclick="submitPvpAction('move', ${idx})"`}>
                     <div>
-                      <strong>${m.name}</strong><br />
-                      <small class="muted">Power ${m.power}</small>
+                      <strong>${m.name}</strong> ${m.role === "Signature" ? `<span class="excl-badge">★</span>` : ""}<br />
+                      <small class="muted">Pow ${m.power} · ~${pv.est} DMG · ${pv.badge}</small>
                     </div>
                     <span class="type-badge t-${m.type}">${m.type}</span>
-                  </button>`
-                )
+                  </button>`;
+                })
                 .join("")}
             </div>
             <h4 style="margin-top:10px;">Đổi Pokémon (${leftTeam.length} con)</h4>
