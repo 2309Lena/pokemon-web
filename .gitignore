@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.db-wal
+*.db-shm
+.secret_key
+.env
+data/country_sat_maps.json
+static/assets/world/earth_pixel_sat.png

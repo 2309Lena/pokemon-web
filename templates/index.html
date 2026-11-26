@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokéWorld Atlas — Gen 1–9 RPG & TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <!-- AUTH SCREEN -->
+  <section id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="brand-hero">
+        <div class="pokeball-logo"></div>
+        <h1>PokéWorld Atlas</h1>
+        <p>Khám phá 177 quốc gia · Gen 1–9 (1,025 loài) · TCG Booster Shop · PvP & Trade Online</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-login-btn" class="active" onclick="switchAuthMode('login')">Đăng nhập</button>
+        <button id="tab-reg-btn" onclick="switchAuthMode('register')">Tạo Trainer Mới</button>
+      </div>
+
+      <form id="auth-form" onsubmit="submitAuth(event)">
+        <label>Tên Trainer</label>
+        <input id="auth-username" type="text" placeholder="vd: AshKetchum" required />
+        <label>Mật khẩu</label>
+        <input id="auth-password" type="password" placeholder="Tối thiểu 4 ký tự" required />
+
+        <div id="starter-picker" class="starter-picker hidden">
+          <label>1. Chọn 1 Lục Địa Xuất Phát (5 lục địa còn lại đều khóa, dùng Open Point để mở):</label>
+          <div id="continent-pick-grid" class="continent-pick-grid"></div>
+          <label>2. Chọn Pokémon Khởi Đầu:</label>
+          <div id="starter-grid" class="starter-grid"></div>
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="btn-primary full-w">Đăng nhập</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <div id="app-shell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="pokeball-logo small"></div>
+        <div>
+          <div class="app-title">PokéWorld Atlas</div>
+          <div class="sub-tag">Gen 1–9 · 177 Quốc Gia</div>
+        </div>
+      </div>
+
+      <div class="trainer-hud">
+        <div class="hud-pill">
+          <strong id="hud-username">Trainer</strong>
+          <span class="lv-badge">Lv.<span id="hud-level">1</span></span>
+          <div class="xp-bar-mini"><div id="hud-xp-fill"></div></div>
+          <small id="hud-xp-text">0/80</small>
+        </div>
+        <div class="hud-pill highlight-open" title="Mỗi lần lên cấp Trainer nhận +1 Open Point để mở 1 quốc gia mới">
+          <img class="px-icon" src="/static/assets/ui/globe.svg" alt="" /> Open: <strong id="hud-open-pts">0</strong>
+        </div>
+        <div class="hud-pill"><img class="px-icon" src="/static/assets/ui/coin.svg" alt="" /> <strong id="hud-coins">1500</strong></div>
+        <div class="hud-pill"><img class="px-icon" src="/static/assets/ui/ticket_gold.png" alt="" /> <strong id="hud-tickets">12</strong></div>
+        <div class="hud-pill"><img class="px-icon" src="/static/assets/ui/ticket_x10.png" alt="" /> <strong id="hud-tickets10">1</strong></div>
+        <div class="hud-pill"><img class="px-icon" src="/static/assets/ui/star.svg" alt="" /> <strong id="hud-stardust">100</strong></div>
+        <div class="hud-pill"><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> <strong id="hud-dex">0</strong>/1025</div>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="btn-sm btn-gold" onclick="claimDaily()"><img class="px-icon" src="/static/assets/ui/gift.svg" alt="" /> Điểm danh</button>
+        <button class="btn-sm" onclick="openSettings()"><img class="px-icon" src="/static/assets/ui/gear.png" alt="" /> Setting</button>
+        <button class="btn-sm btn-danger" onclick="logout()"><img class="px-icon" src="/static/assets/ui/door.svg" alt="" /> Thoát</button>
+      </div>
+    </header>
+
+    <nav class="nav-tabs">
+      <button class="nav-btn active" data-tab="world" onclick="switchTab('world')"><img class="px-icon" src="/static/assets/ui/globe.svg" alt="" /> Bản Đồ</button>
+      <button class="nav-btn" data-tab="explore" onclick="switchTab('explore')"><img class="px-icon" src="/static/assets/ui/compass.svg" alt="" /> Phiêu Lưu 2D</button>
+      <button class="nav-btn hidden" id="nav-battle-btn" data-tab="battle" onclick="switchTab('battle')"><img class="px-icon" src="/static/assets/ui/sword.svg" alt="" /> Đấu Trường</button>
+      <button class="nav-btn" data-tab="packs" onclick="switchTab('packs')"><img class="px-icon" src="/static/assets/ui/ticket_gold.png" alt="" /> Gacha & TCG</button>
+      <button class="nav-btn" data-tab="relics" onclick="switchTab('relics')"><img class="px-icon" src="/static/assets/relics/crimson_claw.png" alt="" /> Relics Buff</button>
+      <button class="nav-btn" data-tab="missions" onclick="switchTab('missions')"><img class="px-icon" src="/static/assets/ui/scroll.png" alt="" /> Nhiệm Vụ <span id="missions-badge" class="notif-dot hidden">!</span></button>
+      <button class="nav-btn" data-tab="cup" onclick="switchTab('cup')"><img class="px-icon" src="/static/assets/ui/trophy.png" alt="" /> Grand Cup (6v6)</button>
+      <button class="nav-btn" data-tab="team" onclick="switchTab('team')"><img class="px-icon" src="/static/assets/ui/bag.svg" alt="" /> Đội Hình & Dex</button>
+      <button class="nav-btn" data-tab="online" onclick="switchTab('online')"><img class="px-icon" src="/static/assets/ui/online.svg" alt="" /> Online PvP</button>
+    </nav>
+
+    <main class="main-content">
+      <!-- 1. WORLD MAP TAB -->
+      <section id="panel-world" class="tab-panel active">
+        <div class="world-layout">
+          <div class="world-map-card">
+            <div class="panel-header-row">
+              <div>
+                <h2>Bản Đồ Trái Đất (177 Quốc Gia)</h2>
+                <p class="muted">Khởi đầu 1 nước ở lục địa bạn chọn · Lên 1 cấp Trainer = +1 Open Point mở nước mới · Pokémon đặc trưng chỉ xuất hiện ở đúng quốc gia của nó!</p>
+              </div>
+              <div class="continent-filters" id="continent-filters"></div>
+            </div>
+            <div class="map-svg-wrap">
+              <svg id="world-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+            <div class="map-legend">
+              <span><i class="dot dot-unlocked"></i> Đã mở khóa</span>
+              <span><i class="dot dot-starter"></i> Điểm xuất phát</span>
+              <span><i class="dot dot-locked"></i> Chưa mở (cần 1 Open Point)</span>
+            </div>
+          </div>
+
+          <aside class="country-drawer" id="country-drawer">
+            <div class="empty-hint">Chọn một quốc gia trên bản đồ để xem Pokémon Đặc Trưng & mở khóa hoặc thám hiểm!</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 2. 2D RPG EXPLORER TAB -->
+      <section id="panel-explore" class="tab-panel">
+        <div class="explore-layout">
+          <div class="rpg-stage-card">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="explore-title">Chọn một quốc gia đã mở khóa</h2>
+                <p id="explore-sub" class="muted">Di chuyển bằng WASD / Phím mũi tên hoặc D-Pad. Đi vào bụi cỏ để gặp Pokémon!</p>
+              </div>
+              <div class="explore-quick-btns">
+                <button class="btn-primary" onclick="triggerExploreEncounter(false)"><img class="px-icon" src="/static/assets/ui/compass.svg" alt="" /> Tìm Pokémon</button>
+                <button class="btn-gold" onclick="triggerExploreEncounter(true)"><img class="px-icon" src="/static/assets/ui/star.svg" alt="" /> Săn Đặc Trưng</button>
+                <button class="btn-danger" onclick="startCountryTrainer()"><img class="px-icon" src="/static/assets/ui/sword.svg" alt="" /> Ace Trainer (3v3)</button>
+              </div>
+            </div>
+            <canvas id="rpg-canvas" width="800" height="560"></canvas>
+            <div class="dpad-bar">
+              <div class="dpad">
+                <button onclick="movePlayer(0,-1)">▲</button>
+                <div>
+                  <button onclick="movePlayer(-1,0)">◀</button>
+                  <button onclick="movePlayer(0,1)">▼</button>
+                  <button onclick="movePlayer(1,0)">▶</button>
+                </div>
+              </div>
+              <div class="tile-legend">
+                <span>🟩 Cỏ cao: Gặp Pokémon theo thời tiết</span>
+                <span>🛤️ Đường nối các địa danh</span>
+                <span>🪧 Biển chỉ dẫn vùng</span>
+                <span>🏥 PokéCenter</span>
+                <span>❗ Ace Trainer (3v3)</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="explore-sidebar" id="explore-sidebar"></aside>
+        </div>
+      </section>
+
+      <!-- 3. BATTLE ARENA TAB -->
+      <section id="panel-battle" class="tab-panel">
+        <div class="battle-container">
+          <div class="battle-header">
+            <h2 id="battle-title">Trận Đấu</h2>
+            <span id="battle-mode-badge" class="badge">3v3</span>
+          </div>
+
+          <div class="battle-stage" id="battle-stage">
+            <canvas id="battle-vfx-canvas" width="960" height="420"></canvas>
+
+            <div class="sprite-wrap enemy-platform-wrap">
+              <div class="turf-shadow"></div>
+              <img id="enemy-sprite" class="poke-idle-anim" src="" alt="Enemy" onclick="playCry(currentEnemySpeciesId)" />
+            </div>
+
+            <div class="sprite-wrap player-platform-wrap">
+              <div class="turf-shadow"></div>
+              <img id="player-sprite" class="poke-idle-anim" src="" alt="Player" onclick="playCry(currentPlayerSpeciesId)" />
+            </div>
+          </div>
+
+          <!-- NINTENDO CONSOLE STYLE BOTTOM HEALTH HUD -->
+          <div class="nintendo-hud-dock">
+            <div class="nintendo-plate player-plate">
+              <div class="plate-head">
+                <div class="plate-title">
+                  <span class="side-tag player-tag">ALLY</span>
+                  <strong id="player-name">Player</strong>
+                  <span id="player-tier-badge"></span>
+                </div>
+                <span class="lv-pill">Lv.<span id="player-lvl">5</span></span>
+              </div>
+              <div class="plate-sub">
+                <div class="type-row" id="player-types"></div>
+                <div class="party-pips" id="player-pips"></div>
+              </div>
+              <div class="nintendo-hp-row">
+                <span class="hp-badge">HP</span>
+                <div class="hp-track"><div id="player-hp-bar" class="hp-fill"></div></div>
+                <span id="player-hp-text" class="hp-num">50/50 HP</span>
+              </div>
+            </div>
+
+            <div class="nintendo-plate enemy-plate">
+              <div class="plate-head">
+                <div class="plate-title">
+                  <span class="side-tag enemy-tag">FOE</span>
+                  <strong id="enemy-name">Enemy</strong>
+                  <span id="enemy-tier-badge"></span>
+                  <span id="enemy-excl-tag" class="excl-pill hidden">ĐỘC QUYỀN</span>
+                </div>
+                <span class="lv-pill">Lv.<span id="enemy-lvl">5</span></span>
+              </div>
+              <div class="plate-sub">
+                <div class="type-row" id="enemy-types"></div>
+                <div class="party-pips" id="enemy-pips"></div>
+              </div>
+              <div class="nintendo-hp-row">
+                <span class="hp-badge">HP</span>
+                <div class="hp-track"><div id="enemy-hp-bar" class="hp-fill"></div></div>
+                <span id="enemy-hp-text" class="hp-num">50/50 HP</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="battle-controls-grid">
+            <div class="battle-actions-panel">
+              <h4>Chiêu thức</h4>
+              <div id="battle-moves" class="moves-grid"></div>
+
+              <h4>Vật phẩm & Bắt Pokémon</h4>
+              <div id="battle-items" class="battle-items-row"></div>
+
+              <h4>Đổi Pokémon trong đội (<span id="battle-team-cap">3</span> con)</h4>
+              <div id="battle-switch-bar" class="switch-bar"></div>
+
+              <div id="battle-end-bar" class="battle-end-bar hidden"></div>
+            </div>
+
+            <div class="battle-log-panel">
+              <h4>Nhật ký chiến đấu</h4>
+              <div id="battle-log" class="battle-log"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. GACHA & TCG PACK SHOP TAB -->
+      <section id="panel-packs" class="tab-panel">
+        <div class="gacha-header-bar">
+          <div class="gacha-brand">
+            <h2 class="pixel-h2">Gacha</h2>
+            <div class="sub-tabs-bar" style="margin:0;">
+              <button class="active" id="subtab-gacha-btn" onclick="switchGachaSubtab('gacha')"><img class="px-icon" src="/static/assets/ui/ticket_gold.png" alt="" /> Region Gacha</button>
+              <button id="subtab-packshop-btn" onclick="switchGachaSubtab('packshop')"><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> TCG Booster & Mart</button>
+            </div>
+          </div>
+          <button class="btn-sm" onclick="switchTab('world')">Back</button>
+        </div>
+
+        <!-- GACHA VIEW (matching reference layout) -->
+        <div id="gacha-main-view">
+          <div id="gacha-region-tabs" class="gacha-region-tabs"></div>
+          <div class="gacha-grid">
+            <div class="gacha-left">
+              <div id="gacha-banner-box" class="gacha-banner-box"></div>
+              <div id="gacha-pull-buttons" class="gacha-pull-buttons"></div>
+              <div id="gacha-ticket-status" class="gacha-ticket-status"></div>
+            </div>
+            <div id="gacha-odds-card" class="gacha-odds-card"></div>
+          </div>
+          <div id="gacha-reveal-modal" class="pack-reveal-stage hidden" style="margin-top:18px;"></div>
+        </div>
+
+        <!-- TCG PACKS + POKEMART VIEW -->
+        <div id="packshop-main-view" class="hidden">
+          <div id="pack-reveal-stage" class="pack-reveal-stage hidden"></div>
+          <div id="packs-grid" class="packs-grid"></div>
+          <hr class="sep" />
+          <h3><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> PokéMart — Bóng Bắt, Vé Gacha & Vật Phẩm</h3>
+          <div id="pokemart-grid" class="pokemart-grid"></div>
+        </div>
+      </section>
+
+      <!-- 4B. RELICS BUFF ARMORY TAB -->
+      <section id="panel-relics" class="tab-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2><img class="px-icon lg" src="/static/assets/relics/crimson_claw.png" alt="" /> Kho Relic Buff Chỉ Số</h2>
+            <p class="muted">Mỗi Relic sở hữu hiệu ứng animation riêng biệt! Trang bị tối đa <strong>3 Relic</strong> để cộng thẳng vào ATK, DEF, SPD, HP, Tỉ lệ bắt, Coins & Shiny.</p>
+          </div>
+          <div id="relic-bonus-summary" class="hud-pill highlight-open">Đang kích hoạt: 0/3</div>
+        </div>
+        <div id="relics-grid" class="relics-grid"></div>
+      </section>
+
+      <!-- 4C. MISSIONS (DAILY / WEEKLY / MONTHLY) TAB -->
+      <section id="panel-missions" class="tab-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2><img class="px-icon lg" src="/static/assets/ui/scroll.png" alt="" /> Nhiệm Vụ Ngày · Tuần · Tháng</h2>
+            <p class="muted">Hoàn thành nhiệm vụ khi chiến đấu, bắt Pokémon, quay Gacha & mở khóa quốc gia để nhận PokéCoins, Tickets & Master Ball!</p>
+          </div>
+          <div class="sub-tabs-bar" style="margin:0;">
+            <button class="active" id="mtab-daily" onclick="setMissionPeriod('daily')">📅 Ngày</button>
+            <button id="mtab-weekly" onclick="setMissionPeriod('weekly')">📆 Tuần</button>
+            <button id="mtab-monthly" onclick="setMissionPeriod('monthly')">🗓️ Tháng</button>
+          </div>
+        </div>
+        <div id="missions-list" class="missions-list"></div>
+      </section>
+
+      <!-- 5. GRAND CUP 6v6 TAB -->
+      <section id="panel-cup" class="tab-panel">
+        <div class="panel-header-row">
+          <div>
+            <h2>🏆 Grand Cup — Giải Đấu Lớn (Đội hình 6 Pokémon)</h2>
+            <p class="muted">Đấu giải mở khóa toàn bộ 6 ô đội hình! Vượt qua các vòng đấu liên tiếp để rinh cúp vô địch, Ultra Ball, Rare Candy & lượng lớn XP mở quốc gia!</p>
+          </div>
+        </div>
+        <div id="cups-grid" class="cups-grid"></div>
+      </section>
+
+      <!-- 6. TEAM 3/6 & POKEDEX TAB -->
+      <section id="panel-team" class="tab-panel">
+        <div class="team-builders-row">
+          <div class="team-box">
+            <h3>⚔️ Đội Hình Thường (3 Pokémon — Hoang dã / Trainer)</h3>
+            <div id="team-slots-3" class="team-slots-grid"></div>
+          </div>
+          <div class="team-box">
+            <h3>🏆 Đội Hình Grand Cup & PvP 6v6 (6 Pokémon)</h3>
+            <div id="team-slots-6" class="team-slots-grid six"></div>
+          </div>
+        </div>
+
+        <div class="sub-tabs-bar">
+          <button class="active" id="subtab-bag-btn" onclick="switchTeamSubtab('bag')">📦 Kho Pokémon Của Tôi</button>
+          <button id="subtab-dex-btn" onclick="switchTeamSubtab('dex')">📖 Pokédex Thế Giới (1,025 loài Gen 1–9)</button>
+        </div>
+
+        <div id="team-bag-view">
+          <div class="filter-bar">
+            <input id="bag-search" type="text" placeholder="Tìm Pokémon của bạn..." oninput="renderMyPokemon()" />
+            <select id="bag-tier-filter" onchange="renderMyPokemon()">
+              <option value="all">Tất cả Tier (Common → Mythic)</option>
+              <option value="Mythic">Mythic (Thần Thoại)</option>
+              <option value="Legendary">Legendary (Huyền Thoại)</option>
+              <option value="Epic">Epic (Sử Thi / Pseudo)</option>
+              <option value="Rare">Rare (Hiếm)</option>
+              <option value="Uncommon">Uncommon (Khá Phổ Biến)</option>
+              <option value="Common">Common (Đại Trà)</option>
+            </select>
+          </div>
+          <div id="my-pokemon-grid" class="pokemon-cards-grid"></div>
+        </div>
+
+        <div id="team-dex-view" class="hidden">
+          <div class="filter-bar">
+            <input id="dex-search" type="text" placeholder="Tìm tên hoặc #ID (vd: Pikachu, Rayquaza, 25)..." oninput="renderPokedex()" />
+            <select id="dex-tier-filter" onchange="renderPokedex()">
+              <option value="all">Tất cả Tier (Common → Mythic)</option>
+              <option value="Mythic">Mythic (23 loài)</option>
+              <option value="Legendary">Legendary (71 loài)</option>
+              <option value="Epic">Epic (146 loài)</option>
+              <option value="Rare">Rare (349 loài)</option>
+              <option value="Uncommon">Uncommon (206 loài)</option>
+              <option value="Common">Common (230 loài)</option>
+            </select>
+            <select id="dex-gen-filter" onchange="renderPokedex()">
+              <option value="all">Tất cả Gen (1–9)</option>
+              <option value="1">Gen 1 (Kanto)</option>
+              <option value="2">Gen 2 (Johto)</option>
+              <option value="3">Gen 3 (Hoenn)</option>
+              <option value="4">Gen 4 (Sinnoh)</option>
+              <option value="5">Gen 5 (Unova)</option>
+              <option value="6">Gen 6 (Kalos)</option>
+              <option value="7">Gen 7 (Alola)</option>
+              <option value="8">Gen 8 (Galar/Hisui)</option>
+              <option value="9">Gen 9 (Paldea)</option>
+            </select>
+            <label class="chk-inline"><input type="checkbox" id="dex-excl-only" onchange="renderPokedex()" /> Chỉ hiện Pokémon Độc Quyền Quốc Gia</label>
+          </div>
+          <div id="pokedex-grid" class="pokemon-cards-grid"></div>
+        </div>
+      </section>
+
+      <!-- 7. ONLINE PVP & TRADE TAB -->
+      <section id="panel-online" class="tab-panel">
+        <div class="online-layout">
+          <div class="online-lobby-card">
+            <div class="panel-header-row">
+              <h3>🌐 Sảnh Online — PvP & Giao Dịch</h3>
+              <button class="btn-sm" onclick="refreshOnlineRooms()">🔄 Làm mới</button>
+            </div>
+            <form class="create-room-form" onsubmit="createOnlineRoom(event)">
+              <input id="room-title" type="text" placeholder="Tên phòng (vd: Giao lưu 3v3)" required />
+              <select id="room-mode">
+                <option value="pvp_3v3">⚔️ PvP 3v3</option>
+                <option value="pvp_6v6">🏆 PvP 6v6 (Grand)</option>
+                <option value="trade">🤝 Trade Pokémon</option>
+              </select>
+              <select id="room-slots" title="Số chỗ tối đa trong phòng">
+                <option value="2">2 chỗ</option>
+                <option value="4">4 chỗ (kèm khán giả)</option>
+                <option value="6">6 chỗ</option>
+              </select>
+              <button type="submit" class="btn-primary">+ Tạo Phòng</button>
+            </form>
+
+            <div class="join-code-row">
+              <input id="join-code-input" type="text" placeholder="Nhập mã phòng 6 ký tự..." />
+              <button class="btn-gold" onclick="joinByCode()">Vào bằng mã</button>
+            </div>
+
+            <div id="online-rooms-list" class="rooms-list"></div>
+          </div>
+
+          <div class="online-room-stage" id="online-room-stage">
+            <div class="empty-hint">Tạo hoặc tham gia một phòng để đấu PvP (3v3 / 6v6) hoặc Trao đổi Pokémon với người chơi khác!</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card pixel-box">
+      <div class="panel-header-row">
+        <h3><img class="px-icon" src="/static/assets/ui/gear.png" alt="" /> Cài Đặt Âm Thanh</h3>
+        <button class="btn-sm btn-danger" onclick="closeSettings()">X</button>
+      </div>
+      <div class="setting-row">
+        <label>Âm Lượng Tiếng Kêu / Chính: <strong id="lbl-cry-vol">60%</strong></label>
+        <input type="range" id="set-cry-vol" min="0" max="100" value="60" oninput="updateAudioSettings()" />
+      </div>
+      <div class="setting-row">
+        <label>Âm Lượng Hiệu Ứng (SFX): <strong id="lbl-sfx-vol">70%</strong></label>
+        <input type="range" id="set-sfx-vol" min="0" max="100" value="70" oninput="updateAudioSettings()" />
+      </div>
+      <div class="setting-row">
+        <label>Âm Lượng Nhạc Nền 8-bit: <strong id="lbl-bgm-vol">35%</strong></label>
+        <input type="range" id="set-bgm-vol" min="0" max="100" value="35" oninput="updateAudioSettings()" />
+      </div>
+      <div class="setting-checks">
+        <label class="chk-inline"><input type="checkbox" id="set-sfx-on" checked onchange="updateAudioSettings()" /> Bật SFX 8-bit</label>
+        <label class="chk-inline"><input type="checkbox" id="set-cry-on" checked onchange="updateAudioSettings()" /> Bật Tiếng Kêu Pokémon</label>
+        <label class="chk-inline"><input type="checkbox" id="set-bgm-on" onchange="updateAudioSettings()" /> Bật Nhạc Nền 8-bit</label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn-primary" onclick="testSound()">🔊 Nghe Thử SFX</button>
+        <button class="btn-green" onclick="closeSettings()">Lưu & Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/vfx.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
