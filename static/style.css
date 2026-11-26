@@ -517,3 +517,53 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .setting-row { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; }
 .setting-row input[type="range"] { width: 100%; accent-color: var(--gold); }
 .setting-checks { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+
+/* Salvage Bar & Friends Panel */
+.bulk-salvage-bar {
+  background: linear-gradient(135deg, #16223d, #11192d);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.salvage-rates-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.85rem; }
+.bulk-salvage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.friend-add-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.friend-add-form input {
+  background: #0d1424;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 8px;
+  min-width: 240px;
+}
+.friends-layout { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 16px; }
+@media (max-width: 900px) { .friends-layout { grid-template-columns: 1fr; } }
+.friends-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.friends-box h3 { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+.friends-list { display: flex; flex-direction: column; gap: 10px; }
+.friend-card {
+  background: #0d1526;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.friend-meta { display: flex; align-items: center; gap: 10px; }
+.online-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.online-dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.online-dot.offline { background: #64748b; }
+.friend-actions { display: flex; flex-wrap: wrap; gap: 6px; }

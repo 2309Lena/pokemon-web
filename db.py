@@ -168,6 +168,17 @@ def init_db():
             PRIMARY KEY (user_id, mission_id, period_key),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS friendships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            requester_id INTEGER NOT NULL,
+            addressee_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at REAL NOT NULL,
+            UNIQUE(requester_id, addressee_id),
+            FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (addressee_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
     # Safe migration for existing SQLite databases missing new columns
@@ -176,6 +187,15 @@ def init_db():
         cur.execute("ALTER TABLE users ADD COLUMN tickets INTEGER NOT NULL DEFAULT 12")
     if "tickets_x10" not in cols:
         cur.execute("ALTER TABLE users ADD COLUMN tickets_x10 INTEGER NOT NULL DEFAULT 1")
+    if "last_seen" not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN last_seen REAL NOT NULL DEFAULT 0")
+    conn.commit()
+    conn.close()
+
+
+def touch_user_seen(user_id):
+    conn = get_conn()
+    conn.execute("UPDATE users SET last_seen = ? WHERE id = ?", (time.time(), user_id))
     conn.commit()
     conn.close()
 

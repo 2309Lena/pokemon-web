@@ -29,7 +29,16 @@ from db import (
     init_db,
     pokemon_xp_needed,
     set_team_slot,
+    touch_user_seen,
     unlock_country_for_user,
+)
+from friends_salvage import (
+    SALVAGE_RATES,
+    get_friends_overview,
+    remove_friend,
+    respond_friend_request,
+    salvage_pokemon_list,
+    send_friend_request,
 )
 from online import (
     confirm_trade,
@@ -160,6 +169,7 @@ def api_login():
     if not u:
         return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu."}), 401
     session["user_id"] = u["id"]
+    touch_user_seen(u["id"])
     return jsonify({"user": get_user_profile(u["id"])})
 
 
@@ -178,6 +188,7 @@ def api_me():
     if not prof:
         session.pop("user_id", None)
         return jsonify({"user": None})
+    touch_user_seen(uid)
     return jsonify({"user": prof})
 
 
@@ -501,6 +512,78 @@ def api_pokemon_candy(uid):
         return jsonify({"error": "Bạn đã hết Rare Candy!"}), 400
     updated = award_pokemon_xp(uid, poke_id, pokemon_xp_needed(prow["level"]))
     return jsonify({"pokemon": updated, "user": get_user_profile(uid)})
+
+
+@app.route("/api/pokemon/salvage", methods=["POST"])
+@login_required
+def api_pokemon_salvage(uid):
+    data = request.get_json(silent=True) or {}
+    bulk_tier = data.get("bulk_tier")
+    poke_ids = data.get("pokemon_ids")
+    if poke_ids is None and data.get("pokemon_id") is not None:
+        poke_ids = [int(data["pokemon_id"])]
+    keep_team = bool(data.get("keep_team", True))
+
+    res, err = salvage_pokemon_list(uid, pokemon_ids=poke_ids, bulk_tier=bulk_tier, keep_team=keep_team)
+    if err:
+        return jsonify({"error": err}), 400
+
+    parts = []
+    if res["coins"]:
+        parts.append(f"+{res['coins']} PokéCoins")
+    if res["tickets"]:
+        parts.append(f"+{res['tickets']} Vé quay thường")
+    if res["tickets_x10"]:
+        parts.append(f"+{res['tickets_x10']} Vé Tím (x10)")
+    msg = f"Đã tách {res['count']} Pokémon → {', '.join(parts)}!"
+    return jsonify({"result": res, "rates": SALVAGE_RATES, "message": msg, "user": get_user_profile(uid)})
+
+
+@app.route("/api/friends", methods=["GET"])
+@login_required
+def api_friends_list(uid):
+    touch_user_seen(uid)
+    return jsonify(get_friends_overview(uid))
+
+
+@app.route("/api/friends/request", methods=["POST"])
+@login_required
+def api_friends_request(uid):
+    touch_user_seen(uid)
+    data = request.get_json(silent=True) or {}
+    res, err = send_friend_request(uid, data.get("username", ""))
+    if err:
+        return jsonify({"error": err}), 400
+    msg = (
+        f"Bạn và {res['username']} đã trở thành bạn bè!"
+        if res["status"] == "accepted"
+        else f"Đã gửi lời mời kết bạn tới {res['username']}!"
+    )
+    return jsonify({"result": res, "message": msg, "overview": get_friends_overview(uid)})
+
+
+@app.route("/api/friends/respond", methods=["POST"])
+@login_required
+def api_friends_respond(uid):
+    touch_user_seen(uid)
+    data = request.get_json(silent=True) or {}
+    req_id = int(data.get("request_id", 0))
+    action = data.get("action", "")
+    res, err = respond_friend_request(uid, req_id, action)
+    if err:
+        return jsonify({"error": err}), 400
+    msg = "Đã chấp nhận kết bạn!" if res["action"] == "accept" else "Đã từ chối lời mời."
+    return jsonify({"result": res, "message": msg, "overview": get_friends_overview(uid)})
+
+
+@app.route("/api/friends/remove", methods=["POST"])
+@login_required
+def api_friends_remove(uid):
+    touch_user_seen(uid)
+    data = request.get_json(silent=True) or {}
+    friend_id = int(data.get("friend_id", 0))
+    remove_friend(uid, friend_id)
+    return jsonify({"message": "Đã hủy kết bạn.", "overview": get_friends_overview(uid)})
 
 
 @app.route("/api/online/rooms")

@@ -89,6 +89,7 @@
       <button class="nav-btn" data-tab="cup" onclick="switchTab('cup')"><img class="px-icon" src="/static/assets/ui/trophy.png" alt="" /> Grand Cup (6v6)</button>
       <button class="nav-btn" data-tab="team" onclick="switchTab('team')"><img class="px-icon" src="/static/assets/ui/bag.svg" alt="" /> Đội Hình & Dex</button>
       <button class="nav-btn" data-tab="online" onclick="switchTab('online')"><img class="px-icon" src="/static/assets/ui/online.svg" alt="" /> Online PvP</button>
+      <button class="nav-btn" data-tab="friends" onclick="switchTab('friends')"><img class="px-icon" src="/static/assets/ui/friends.svg" alt="" /> Bạn Bè <span id="friends-badge" class="notif-dot hidden">!</span></button>
     </nav>
 
     <main class="main-content">
@@ -353,6 +354,20 @@
               <option value="Common">Common (Đại Trà)</option>
             </select>
           </div>
+          <div class="bulk-salvage-bar">
+            <div class="salvage-rates-info">
+              <img class="px-icon" src="/static/assets/ui/salvage.svg" alt="" />
+              <strong>Tách Pokémon:</strong>
+              <span>Common <b>60 Coins</b> · Uncommon <b>120 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
+            </div>
+            <div class="bulk-salvage-actions">
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Common')">Tách hết Common</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Uncommon')">Tách hết Uncommon</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Rare')">Tách hết Rare</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Epic')">Tách hết Epic</button>
+              <small class="muted">(Tự giữ Pokémon trong đội hình & Shiny)</small>
+            </div>
+          </div>
           <div id="my-pokemon-grid" class="pokemon-cards-grid"></div>
         </div>
 
@@ -419,6 +434,35 @@
 
           <div class="online-room-stage" id="online-room-stage">
             <div class="empty-hint">Tạo hoặc tham gia một phòng để đấu PvP (3v3 / 6v6) hoặc Trao đổi Pokémon với người chơi khác!</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. FRIENDS TAB -->
+      <section id="panel-friends" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <h2><img class="px-icon" src="/static/assets/ui/friends.svg" alt="" /> Danh Sách Bạn Bè</h2>
+            <p class="muted">Kết bạn bằng tên Trainer, xem trạng thái Online và tạo nhanh phòng PvP / Trade cùng bạn bè.</p>
+          </div>
+          <form class="friend-add-form" onsubmit="sendFriendRequest(event)">
+            <input id="friend-username-input" type="text" placeholder="Nhập tên Trainer muốn kết bạn..." required />
+            <button type="submit" class="btn-primary">+ Gửi Lời Mời</button>
+          </form>
+        </div>
+
+        <div class="friends-layout">
+          <div class="friends-box">
+            <h3>📬 Lời mời đến <span id="friends-incoming-count" class="badge">0</span></h3>
+            <div id="friends-incoming-list" class="friends-list"></div>
+
+            <h3 style="margin-top:18px;">📤 Đã gửi <span id="friends-outgoing-count" class="badge">0</span></h3>
+            <div id="friends-outgoing-list" class="friends-list"></div>
+          </div>
+
+          <div class="friends-box">
+            <h3>🤝 Bạn bè của bạn <span id="friends-accepted-count" class="badge">0</span></h3>
+            <div id="friends-list" class="friends-list"></div>
           </div>
         </div>
       </section>

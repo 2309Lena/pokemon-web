@@ -227,7 +227,7 @@ async function enterApp() {
   document.getElementById("auth-screen").classList.add("hidden");
   document.getElementById("app-shell").classList.remove("hidden");
   updateHUD();
-  await Promise.all([loadWorld(), loadGachaBanners(), loadPacksAndShop(), loadCups()]);
+  await Promise.all([loadWorld(), loadGachaBanners(), loadPacksAndShop(), loadCups(), loadFriends(true)]);
   renderTeamAndBag();
   renderRelics();
   renderMissions();
@@ -261,6 +261,7 @@ function switchTab(tab) {
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
   document.getElementById(`panel-${tab}`).classList.add("active");
   if (tab === "online") refreshOnlineRooms();
+  if (tab === "friends") loadFriends();
   if (tab === "team") renderTeamAndBag();
   if (tab === "cup") loadCups();
   if (tab === "packs") renderGachaView();
@@ -1138,6 +1139,15 @@ function renderTeamSlots(size, containerId) {
   document.getElementById(containerId).innerHTML = html;
 }
 
+const SALVAGE_LABEL = {
+  Common: "60 Coins",
+  Uncommon: "120 Coins",
+  Rare: "3 Vé Thường",
+  Epic: "5 Vé Thường",
+  Legendary: "1 Vé Tím",
+  Mythic: "3 Vé Tím",
+};
+
 function renderMyPokemon() {
   if (!currentUser) return;
   const q = (document.getElementById("bag-search")?.value || "").toLowerCase();
@@ -1148,12 +1158,14 @@ function renderMyPokemon() {
     .slice()
     .sort((a, b) => (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) || b.level - a.level);
   document.getElementById("my-pokemon-grid").innerHTML = list
-    .map(
-      (p) => `
+    .map((p) => {
+      const tier = p.tier || "Common";
+      const safeName = (p.nickname || p.species_name || "").replace(/'/g, "\\'");
+      return `
       <div class="poke-card">
         <div class="poke-card-top">
           <span>#${p.species_id} · Lv.${p.level}</span>
-          ${tierBadgeHtml(p.tier)}
+          ${tierBadgeHtml(tier)}
         </div>
         ${pokeImgTag(p.species_id, p.is_shiny, "poke-idle-anim")}
         <strong>${p.is_shiny ? "✨ " : ""}${p.nickname}</strong>
@@ -1164,10 +1176,44 @@ function renderMyPokemon() {
           <button class="btn-sm" onclick="quickAssign(${p.id}, 6)">+Đội 6</button>
           <button class="btn-sm btn-gold" onclick="feedCandy(${p.id})"><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Candy</button>
           ${p.can_evolve ? `<button class="btn-sm btn-green" onclick="evolvePoke(${p.id})">🧬 Tiến hóa</button>` : ""}
+          <button class="btn-sm btn-danger" onclick="salvagePokemon(${p.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "60 Coins"})</button>
         </div>
-      </div>`
-    )
+      </div>`;
+    })
     .join("");
+}
+
+async function salvagePokemon(pokeId, name, tier) {
+  const rewardText = SALVAGE_LABEL[tier] || "Coins";
+  if (!confirm(`Tách ${name} (${tier}) để nhận ${rewardText}? Pokémon bị tách sẽ biến mất vĩnh viễn!`)) return;
+  try {
+    const data = await api("/api/pokemon/salvage", {
+      method: "POST",
+      body: JSON.stringify({ pokemon_id: pokeId }),
+    });
+    currentUser = data.user;
+    updateHUD();
+    renderTeamAndBag();
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function bulkSalvageTier(tier) {
+  if (!confirm(`Tách TẤT CẢ Pokémon bậc ${tier} (tự giữ lại Pokémon trong đội hình 3v3/6v6 và Pokémon Shiny)?`)) return;
+  try {
+    const data = await api("/api/pokemon/salvage", {
+      method: "POST",
+      body: JSON.stringify({ bulk_tier: tier, keep_team: true }),
+    });
+    currentUser = data.user;
+    updateHUD();
+    renderTeamAndBag();
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 function quickAssign(pokeId, size) {
@@ -1532,6 +1578,169 @@ async function confirmOnlineTrade() {
     renderTeamAndBag();
     renderOnlineRoomStage();
     toast("🤝 Hoàn tất giao dịch!", "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+// ---------------- FRIENDS SYSTEM ----------------
+async function loadFriends(silent = false) {
+  try {
+    const data = await api("/api/friends");
+    renderFriends(data);
+  } catch (err) {
+    if (!silent) toast(err.message, "error");
+  }
+}
+
+function renderFriends(data) {
+  const incoming = data.incoming || [];
+  const outgoing = data.outgoing || [];
+  const friends = data.friends || [];
+
+  const badge = document.getElementById("friends-badge");
+  if (badge) {
+    badge.classList.toggle("hidden", incoming.length === 0);
+    badge.textContent = incoming.length;
+  }
+
+  const inCount = document.getElementById("friends-incoming-count");
+  const outCount = document.getElementById("friends-outgoing-count");
+  const accCount = document.getElementById("friends-accepted-count");
+  if (inCount) inCount.textContent = incoming.length;
+  if (outCount) outCount.textContent = outgoing.length;
+  if (accCount) accCount.textContent = friends.length;
+
+  const inEl = document.getElementById("friends-incoming-list");
+  if (inEl) {
+    inEl.innerHTML = incoming.length
+      ? incoming
+          .map(
+            (r) => `
+          <div class="friend-card">
+            <div class="friend-meta">
+              <span class="online-dot ${r.online ? "online" : "offline"}"></span>
+              <div>
+                <strong>${r.username}</strong> <small class="muted">Lv.${r.level}</small>
+              </div>
+            </div>
+            <div class="friend-actions">
+              <button class="btn-sm btn-green" onclick="respondFriend(${r.request_id}, 'accept')">Chấp nhận</button>
+              <button class="btn-sm btn-danger" onclick="respondFriend(${r.request_id}, 'reject')">Từ chối</button>
+            </div>
+          </div>`
+          )
+          .join("")
+      : `<div class="muted">Không có lời mời kết bạn nào.</div>`;
+  }
+
+  const outEl = document.getElementById("friends-outgoing-list");
+  if (outEl) {
+    outEl.innerHTML = outgoing.length
+      ? outgoing
+          .map(
+            (r) => `
+          <div class="friend-card">
+            <div class="friend-meta">
+              <span class="online-dot ${r.online ? "online" : "offline"}"></span>
+              <div>
+                <strong>${r.username}</strong> <small class="muted">Lv.${r.level} · Đang chờ...</small>
+              </div>
+            </div>
+          </div>`
+          )
+          .join("")
+      : `<div class="muted">Chưa gửi lời mời nào.</div>`;
+  }
+
+  const fEl = document.getElementById("friends-list");
+  if (fEl) {
+    fEl.innerHTML = friends.length
+      ? friends
+          .map((f) => {
+            const safeUser = (f.username || "").replace(/'/g, "\\'");
+            return `
+          <div class="friend-card">
+            <div class="friend-meta">
+              <span class="online-dot ${f.online ? "online" : "offline"}" title="${f.online ? "Đang Online" : "Offline"}"></span>
+              <div>
+                <strong>${f.username}</strong> <small class="badge">Lv.${f.level}</small><br/>
+                <small class="muted">${f.online ? "🟢 Online" : "⚪ Offline"} · ${f.countries} vùng · ${f.pokedex} loài</small>
+              </div>
+            </div>
+            <div class="friend-actions">
+              <button class="btn-sm btn-primary" onclick="inviteFriendRoom('${safeUser}', 'pvp_3v3')">⚔️ PvP 3v3</button>
+              <button class="btn-sm btn-gold" onclick="inviteFriendRoom('${safeUser}', 'trade')">🤝 Trade</button>
+              <button class="btn-sm btn-danger" onclick="removeFriend(${f.id}, '${safeUser}')">Xóa</button>
+            </div>
+          </div>`;
+          })
+          .join("")
+      : `<div class="muted">Bạn chưa có bạn bè nào. Hãy nhập tên Trainer ở trên để kết bạn!</div>`;
+  }
+}
+
+async function sendFriendRequest(e) {
+  e.preventDefault();
+  const input = document.getElementById("friend-username-input");
+  const username = (input?.value || "").trim();
+  if (!username) return;
+  try {
+    const data = await api("/api/friends/request", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+    if (input) input.value = "";
+    renderFriends(data.overview);
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function respondFriend(requestId, action) {
+  try {
+    const data = await api("/api/friends/respond", {
+      method: "POST",
+      body: JSON.stringify({ request_id: requestId, action }),
+    });
+    renderFriends(data.overview);
+    toast(data.message, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function removeFriend(friendId, username) {
+  if (!confirm(`Hủy kết bạn với ${username}?`)) return;
+  try {
+    const data = await api("/api/friends/remove", {
+      method: "POST",
+      body: JSON.stringify({ friend_id: friendId }),
+    });
+    renderFriends(data.overview);
+    toast(data.message, "info");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function inviteFriendRoom(friendName, mode) {
+  try {
+    const data = await api("/api/online/create", {
+      method: "POST",
+      body: JSON.stringify({
+        title: `${currentUser.username} vs ${friendName}`,
+        mode,
+        max_slots: 2,
+      }),
+    });
+    currentOnlineRoom = data.room;
+    switchTab("online");
+    startOnlinePolling();
+    renderOnlineRoomStage();
+    refreshOnlineRooms();
+    toast(`Đã tạo phòng ${mode === "trade" ? "Trade" : "PvP"}! Mã phòng cho ${friendName}: ${data.room.code}`, "success");
   } catch (err) {
     toast(err.message, "error");
   }
