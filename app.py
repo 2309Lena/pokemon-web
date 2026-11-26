@@ -1,7 +1,11 @@
 import datetime
+import glob
 import gzip
+import hashlib
+import hmac
 import os
 import secrets
+import subprocess
 from functools import wraps
 
 from flask import Flask, jsonify, render_template, request, session
@@ -589,7 +593,70 @@ def api_online_trade_confirm(uid):
     return jsonify({"room": room, "user": get_user_profile(uid)})
 
 
+def _get_webhook_secret():
+    env_s = os.environ.get("GITHUB_WEBHOOK_SECRET")
+    if env_s:
+        return env_s.strip()
+    sec_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".webhook_secret")
+    if os.path.exists(sec_file):
+        with open(sec_file, "r", encoding="utf-8") as f:
+            s = f.read().strip()
+            if s:
+                return s
+    s = secrets.token_hex(24)
+    try:
+        with open(sec_file, "w", encoding="utf-8") as f:
+            f.write(s)
+    except OSError:
+        pass
+    return s
+
+
+@app.route("/api/webhook/deploy", methods=["POST"])
+def api_webhook_deploy():
+    secret = _get_webhook_secret()
+    sig_header = request.headers.get("X-Hub-Signature-256", "")
+    if not sig_header.startswith("sha256="):
+        return jsonify({"error": "Missing signature"}), 403
+    expected = "sha256=" + hmac.new(
+        secret.encode("utf-8"), request.get_data(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig_header, expected):
+        return jsonify({"error": "Invalid signature"}), 403
+
+    event = request.headers.get("X-GitHub-Event", "")
+    if event == "ping":
+        return jsonify({"ok": True, "event": "ping"})
+    if event != "push":
+        return jsonify({"ok": True, "ignored_event": event})
+
+    payload = request.get_json(silent=True) or {}
+    if payload.get("ref") != "refs/heads/main":
+        return jsonify({"ok": True, "ignored_ref": payload.get("ref")})
+
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    proc = subprocess.run(
+        ["git", "pull", "origin", "main"],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        timeout=25,
+    )
+    if proc.returncode != 0:
+        return jsonify({"ok": False, "stderr": proc.stderr}), 500
+
+    reloaded = []
+    for wsgi_path in glob.glob("/var/www/*_wsgi.py"):
+        try:
+            os.utime(wsgi_path, None)
+            reloaded.append(wsgi_path)
+        except OSError:
+            pass
+    return jsonify({"ok": True, "stdout": proc.stdout.strip(), "reloaded": reloaded})
+
+
 init_db()
+_get_webhook_secret()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT") or os.environ.get("SERVER_PORT") or 5001)
