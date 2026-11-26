@@ -37,6 +37,7 @@ def _format_room(conn, r):
                 "username": p["username"],
                 "level": p["level"],
                 "slot_index": p["slot_index"],
+                "role": "fighter" if p["slot_index"] <= 2 else "spectator",
                 "ready": bool(p["ready"]),
                 "offer_pokemon_id": p["offer_pokemon_id"],
                 "offer_pokemon": offer_poke,
@@ -45,6 +46,8 @@ def _format_room(conn, r):
     host_row = conn.execute(
         "SELECT username FROM users WHERE id = ?", (r["host_user_id"],)
     ).fetchone()
+    spectator_count = sum(1 for p in plist if p["slot_index"] > 2)
+    fighter_count = len(plist) - spectator_count
     return {
         "id": r["id"],
         "code": r["code"],
@@ -54,6 +57,9 @@ def _format_room(conn, r):
         "mode": r["mode"],
         "max_slots": r["max_slots"],
         "occupied_slots": len(plist),
+        "fighter_count": fighter_count,
+        "spectator_count": spectator_count,
+        "spectators_open": max(0, r["max_slots"] - 2),
         "status": r["status"],
         "players": plist,
         "state": json.loads(r["state_json"] or "{}"),
@@ -81,10 +87,10 @@ def get_room(room_id):
     return res
 
 
-def create_room(user_id, title, mode="pvp_3v3", max_slots=2):
+def create_room(user_id, title, mode="pvp_3v3", max_slots=4):
     if mode not in ("pvp_3v3", "pvp_6v6", "trade"):
         return None, "Chế độ phòng không hợp lệ."
-    max_slots = max(2, min(6, int(max_slots or 2)))
+    max_slots = max(2, min(10, int(max_slots or 4)))
     title = (title or "Phòng Đấu Pokémon").strip()[:40]
     code = _gen_code()
     conn = get_conn()
@@ -180,6 +186,9 @@ def toggle_pvp_ready(user_id, room_id):
     if not rp:
         conn.close()
         return None, "Bạn không ở trong phòng này."
+    if rp["slot_index"] > 2:
+        conn.close()
+        return None, "Bạn đang ở slot Khán giả (Slot 3+). Chỉ 2 Đấu thủ mới cần Sẵn sàng!"
 
     team_size = 6 if r["mode"] == "pvp_6v6" else 3
     team = [fighter_from_user_pokemon(p) for p in get_user_team(user_id, max_size=team_size)]
@@ -271,6 +280,7 @@ def submit_pvp_action(user_id, room_id, action, param=0):
         f1 = st["teams"][u1][st["active"][u1]]
         f2 = st["teams"][u2][st["active"][u2]]
         order = [(u1, u2, a1), (u2, u1, a2)] if f1["spd"] >= f2["spd"] else [(u2, u1, a2), (u1, u2, a1)]
+        turn_events = []
 
         for atk_u, def_u, act in order:
             if act["action"] != "move" or st["status"] != "ongoing":
@@ -283,6 +293,14 @@ def submit_pvp_action(user_id, room_id, action, param=0):
             mv = atk_f["moves"][midx]
             dmg, eff, crit = calc_damage(atk_f, def_f, mv)
             def_f["hp"] = max(0, def_f["hp"] - dmg)
+            turn_events.append({
+                "actor_user_id": int(atk_u),
+                "target_user_id": int(def_u),
+                "move_type": mv["type"],
+                "dmg": dmg,
+                "eff": eff,
+                "crit": crit,
+            })
             logs.append(f"{atk_f['name']} dùng {mv['name']} gây {dmg} sát thương!")
             if def_f["hp"] <= 0:
                 logs.append(f"{def_f['name']} gục ngã!")
@@ -297,6 +315,7 @@ def submit_pvp_action(user_id, room_id, action, param=0):
                     award_trainer_xp(int(atk_u), 60, coins_gain=350)
                     award_trainer_xp(int(def_u), 20, coins_gain=80)
 
+        st["last_events"] = turn_events
         st["turn"] += 1
         st["log"] = (st["log"] + logs)[-12:]
         new_status = "finished" if st["status"] == "finished" else "in_progress"

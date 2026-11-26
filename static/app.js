@@ -1863,16 +1863,22 @@ function renderOnlineRoomsList() {
   if (!listEl) return;
   listEl.innerHTML = filtered.length
     ? filtered
-        .map(
-          (r) => `
+        .map((r) => {
+          const isFull = r.occupied_slots >= r.max_slots;
+          const canWatch = r.mode !== "trade" && r.fighter_count >= 2 && !isFull;
+          const btnText = isFull ? "Đã đầy" : canWatch ? "👁️ Xem Trận" : "⚔️ Vào phòng";
+          const btnCls = isFull ? "btn-sm" : canWatch ? "btn-gold btn-sm" : "btn-primary btn-sm";
+          const specText =
+            r.spectators_open > 0 ? ` · Khán giả: ${r.spectator_count}/${r.spectators_open}` : "";
+          return `
           <div class="room-item">
             <div>
               <strong>${escapeHtml(r.title)}</strong> <span class="badge">${r.mode}</span><br/>
-              <small class="muted">Mã: <strong>${r.code}</strong> · Host: ${escapeHtml(r.host_username)} · Chỗ: <strong>${r.occupied_slots}/${r.max_slots}</strong></small>
+              <small class="muted">Mã: <strong>${r.code}</strong> · Host: ${escapeHtml(r.host_username)} · Đấu: ${Math.min(2, r.occupied_slots)}/2${specText}</small>
             </div>
-            <button class="btn-primary btn-sm" onclick="joinOnlineRoom(${r.id})">Vào phòng</button>
-          </div>`
-        )
+            <button class="${btnCls}" ${isFull ? "disabled" : `onclick="joinOnlineRoom(${r.id})"`}>${btnText}</button>
+          </div>`;
+        })
         .join("")
     : `<div class="muted">Không có phòng nào phù hợp. Hãy tạo phòng mới!</div>`;
 }
@@ -1964,31 +1970,50 @@ function startOnlinePolling() {
   }, 2200);
 }
 
+let lastPvpSpriteKey = "";
+let lastPvpTurnVfx = 0;
+
 function renderOnlineRoomStage() {
   const r = currentOnlineRoom;
   if (!r) return;
   const stage = document.getElementById("online-room-stage");
 
+  const fighters = r.players.filter((p) => p.slot_index <= 2);
+  const spectators = r.players.filter((p) => p.slot_index > 2);
+  const mySlot = r.players.find((p) => p.user_id === currentUser.id);
+  const isSpectator = mySlot && mySlot.slot_index > 2;
+
+  const specBadge =
+    r.spectators_open > 0
+      ? `<span class="badge" style="background:#0e7490;">👁️ Khán giả: ${spectators.length}/${r.spectators_open}</span>`
+      : `<span class="badge" style="background:#334155;">🔒 Không mở xem</span>`;
+
   let bodyHtml = `
-    <div class="panel-header-row">
+    <div class="panel-header-row" style="margin-bottom:10px;">
       <div>
-        <h3>${r.title} <span class="badge">${r.mode}</span></h3>
-        <small class="muted">Mã phòng: <strong>${r.code}</strong> · Chỗ: ${r.occupied_slots}/${r.max_slots}</small>
+        <h3 style="margin:0;">${escapeHtml(r.title)} <span class="badge">${r.mode}</span> ${specBadge}</h3>
+        <small class="muted">Mã phòng: <strong>${r.code}</strong> · Chủ phòng: ${escapeHtml(r.host_username)}</small>
       </div>
       <button class="btn-danger btn-sm" onclick="leaveOnlineRoom()">Rời phòng</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      ${r.players
-        .map(
-          (p) => `<div class="hud-pill">Slot ${p.slot_index}: <strong>${p.username}</strong> ${p.ready ? "✅ Sẵn sàng" : "⏳"}</div>`
-        )
-        .join("")}
-    </div>
   `;
 
+  if (spectators.length > 0 || r.spectators_open > 0) {
+    bodyHtml += `
+      <div class="pvp-spectator-strip">
+        <small class="muted">👁️ Slot xem (${spectators.length}/${r.spectators_open}):</small>
+        ${
+          spectators.length
+            ? spectators.map((s) => `<span class="hud-pill" style="padding:2px 8px;font-size:0.78rem;">👁️ ${escapeHtml(s.username)}</span>`).join("")
+            : `<small class="muted">Chưa có khán giả — bạn bè có thể vào bằng mã phòng để xem!</small>`
+        }
+      </div>`;
+  }
+
   if (r.mode === "trade") {
-    const p1 = r.players[0];
-    const p2 = r.players[1];
+    lastPvpSpriteKey = "";
+    const p1 = fighters[0];
+    const p2 = fighters[1];
     const pokeOpts = currentUser.pokemon
       .map((p) => `<option value="${p.id}">${p.species_name} (Lv.${p.level})</option>`)
       .join("");
@@ -1998,7 +2023,7 @@ function renderOnlineRoomStage() {
           .map((p, idx) =>
             p
               ? `<div class="trade-box">
-                  <strong>${p.username}</strong>
+                  <strong>${escapeHtml(p.username)}</strong>
                   ${
                     p.offer_pokemon
                       ? `<img src="${spriteUrl(p.offer_pokemon.species_id, p.offer_pokemon.is_shiny)}" style="width:72px;display:block;margin:8px auto;" /><div>${p.offer_pokemon.species_name} Lv.${p.offer_pokemon.level}</div>`
@@ -2011,54 +2036,209 @@ function renderOnlineRoomStage() {
           .join("")}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <select id="trade-select-poke">${pokeOpts}</select>
+        <select id="trade-select-poke" class="pp-select">${pokeOpts}</select>
         <button class="btn-primary" onclick="sendTradeOffer()">Đặt Lên Bàn Trade</button>
         <button class="btn-green" onclick="confirmOnlineTrade()">🤝 Chốt Giao Dịch</button>
       </div>
       ${r.state.last_trade ? `<p style="color:var(--green);margin-top:10px;">${r.state.last_trade}</p>` : ""}
     `;
-  } else if (r.status === "waiting") {
-    bodyHtml += `
-      <p class="muted">Khi cả 2 người chơi đầu nhấn Sẵn Sàng, trận PvP ${r.mode === "pvp_6v6" ? "6v6" : "3v3"} sẽ bắt đầu ngay!</p>
-      <button class="btn-green" onclick="togglePvpReady()">✅ Sẵn Sàng / Hủy</button>
-    `;
-  } else {
-    const st = r.state;
-    const myKey = String(currentUser.id);
-    const foeKey = String(st.p1_user_id) === myKey ? String(st.p2_user_id) : String(st.p1_user_id);
-    const myMon = st.teams[myKey]?.[st.active[myKey]];
-    const foeMon = st.teams[foeKey]?.[st.active[foeKey]];
-    bodyHtml += `
-      <div class="trade-grid">
-        <div class="trade-box">
-          <strong>Bạn: ${myMon?.name || "?"}</strong> (Lv.${myMon?.level})
-          ${myMon ? `<img src="${spriteUrl(myMon.species_id)}" style="width:82px;display:block;margin:4px auto;" />` : ""}
-          <div>HP: ${myMon?.hp}/${myMon?.max_hp}</div>
-        </div>
-        <div class="trade-box">
-          <strong>Đối thủ: ${foeMon?.name || "?"}</strong> (Lv.${foeMon?.level})
-          ${foeMon ? `<img src="${spriteUrl(foeMon.species_id)}" style="width:82px;display:block;margin:4px auto;" />` : ""}
-          <div>HP: ${foeMon?.hp}/${foeMon?.max_hp}</div>
-        </div>
-      </div>
-      ${
-        st.status === "ongoing" && myMon
-          ? `<div class="moves-grid">${myMon.moves
-              .map(
-                (m, idx) => `<button class="move-btn" onclick="submitPvpAction('move', ${idx})"><span>${m.name}</span><span class="type-badge t-${m.type}">${m.type}</span></button>`
-              )
-              .join("")}</div>`
-          : `<p><strong>${st.winner_user_id === currentUser.id ? "🏆 BẠN ĐÃ THẮNG PVP!" : "Trận đấu kết thúc!"}</strong></p>`
-      }
-      <div class="battle-log" style="margin-top:10px;max-height:140px;">${(st.log || [])
-        .slice()
-        .reverse()
-        .map((l) => `<div>${l}</div>`)
-        .join("")}</div>
-    `;
+    stage.innerHTML = bodyHtml;
+    return;
   }
 
+  if (r.status === "waiting") {
+    lastPvpSpriteKey = "";
+    lastPvpTurnVfx = 0;
+    const p1 = fighters[0];
+    const p2 = fighters[1];
+    bodyHtml += `
+      <div class="pvp-waiting-cards">
+        ${[p1, p2]
+          .map((p, i) =>
+            p
+              ? `<div class="pvp-fighter-slot ${p.ready ? "ready" : ""}">
+                  <small class="muted">Đấu thủ ${i + 1}</small><br/>
+                  <strong style="font-size:1.05rem;">${escapeHtml(p.username)}</strong> <small class="badge">Lv.${p.level}</small>
+                  <div style="margin-top:6px;">${p.ready ? "✅ Đã Sẵn Sàng!" : "⏳ Đang chuẩn bị..."}</div>
+                </div>`
+              : `<div class="pvp-fighter-slot"><small class="muted">Đấu thủ ${i + 1}</small><p class="muted">Đang chờ đối thủ vào phòng...</p></div>`
+          )
+          .join("")}
+      </div>
+      ${
+        isSpectator
+          ? `<div class="pvp-spectator-banner"><span>👁️ Bạn đang ở ghế Khán giả! Trận đấu sẽ tự động phát trực tiếp ngay khi 2 Đấu thủ Sẵn sàng.</span></div>`
+          : `<button class="btn-green full-w" onclick="togglePvpReady()">✅ ${mySlot?.ready ? "Hủy Sẵn Sàng" : `Sẵn Sàng PvP (${r.mode === "pvp_6v6" ? "6v6" : "3v3"})`}</button>`
+      }
+    `;
+    stage.innerHTML = bodyHtml;
+    return;
+  }
+
+  // LIVE PVP BATTLE ARENA (IDENTICAL VISUAL EXPERIENCE TO NPC BATTLE!)
+  const st = r.state;
+  const p1Id = String(st.p1_user_id);
+  const p2Id = String(st.p2_user_id);
+  const myIdStr = String(currentUser.id);
+  const iAmFighter = myIdStr === p1Id || myIdStr === p2Id;
+
+  const leftId = iAmFighter ? myIdStr : p1Id;
+  const rightId = leftId === p1Id ? p2Id : p1Id;
+  const leftPlayer = r.players.find((p) => String(p.user_id) === leftId) || { username: "Trainer 1" };
+  const rightPlayer = r.players.find((p) => String(p.user_id) === rightId) || { username: "Trainer 2" };
+
+  const leftTeam = st.teams[leftId] || [];
+  const rightTeam = st.teams[rightId] || [];
+  const leftIdx = st.active[leftId] || 0;
+  const rightIdx = st.active[rightId] || 0;
+  const leftMon = leftTeam[leftIdx];
+  const rightMon = rightTeam[rightIdx];
+
+  const lPct = leftMon ? Math.max(0, Math.round((leftMon.hp / leftMon.max_hp) * 100)) : 0;
+  const rPct = rightMon ? Math.max(0, Math.round((rightMon.hp / rightMon.max_hp) * 100)) : 0;
+  const lHpColor = lPct > 50 ? "#22c55e" : lPct > 20 ? "#f59e0b" : "#ef4444";
+  const rHpColor = rPct > 50 ? "#22c55e" : rPct > 20 ? "#f59e0b" : "#ef4444";
+  const myActSubmitted = Boolean(st.pending_actions && st.pending_actions[myIdStr]);
+
+  if (isSpectator || !iAmFighter) {
+    bodyHtml += `
+      <div class="pvp-spectator-banner">
+        <span>👁️ CHẾ ĐỘ KHÁN GIẢ — Trực tiếp: ${escapeHtml(leftPlayer.username)} vs ${escapeHtml(rightPlayer.username)}</span>
+        <span class="badge">Lượt ${st.turn || 1}</span>
+      </div>`;
+  }
+
+  const arenaKey = `${r.id}:${leftMon?.species_id}:${leftMon?.is_shiny}:${rightMon?.species_id}:${rightMon?.is_shiny}:${iAmFighter}`;
+
+  bodyHtml += `
+    <div class="battle-stage" id="pvp-battle-stage">
+      <div class="sprite-wrap enemy-platform-wrap">
+        <div class="turf-shadow"></div>
+        <img id="pvp-right-sprite" class="poke-idle-anim" src="" alt="${rightMon?.name || "Foe"}" onclick="playCry(${rightMon?.species_id || 25})" />
+      </div>
+      <div class="sprite-wrap player-platform-wrap">
+        <div class="turf-shadow"></div>
+        <img id="pvp-left-sprite" class="poke-idle-anim" src="" alt="${leftMon?.name || "Ally"}" onclick="playCry(${leftMon?.species_id || 25})" />
+      </div>
+    </div>
+
+    <div class="nintendo-hud-dock">
+      <div class="nintendo-plate player-plate">
+        <div class="plate-head">
+          <div class="plate-title">
+            <span class="side-tag player-tag">${iAmFighter ? "BẠN" : escapeHtml(leftPlayer.username)}</span>
+            <strong>${leftMon?.is_shiny ? "✨ " : ""}${leftMon?.name || "?"}</strong>
+            ${tierBadgeHtml(leftMon?.tier)}
+          </div>
+          <span class="lv-pill">Lv.${leftMon?.level || 1}</span>
+        </div>
+        <div class="plate-sub">
+          <div class="type-row">${typeBadgesHtml(leftMon?.types || ["normal"])}</div>
+          <div class="party-pips">${leftTeam.map((x) => `<span class="pip ${x.hp <= 0 ? "fainted" : ""}"></span>`).join("")}</div>
+        </div>
+        <div class="nintendo-hp-row">
+          <span class="hp-badge">HP</span>
+          <div class="hp-track"><div class="hp-fill" style="width:${lPct}%;background:${lHpColor};"></div></div>
+          <span class="hp-num">${leftMon?.hp || 0}/${leftMon?.max_hp || 0} HP</span>
+        </div>
+      </div>
+
+      <div class="nintendo-plate enemy-plate">
+        <div class="plate-head">
+          <div class="plate-title">
+            <span class="side-tag enemy-tag">${escapeHtml(rightPlayer.username)}</span>
+            <strong>${rightMon?.is_shiny ? "✨ " : ""}${rightMon?.name || "?"}</strong>
+            ${tierBadgeHtml(rightMon?.tier)}
+          </div>
+          <span class="lv-pill">Lv.${rightMon?.level || 1}</span>
+        </div>
+        <div class="plate-sub">
+          <div class="type-row">${typeBadgesHtml(rightMon?.types || ["normal"])}</div>
+          <div class="party-pips">${rightTeam.map((x) => `<span class="pip ${x.hp <= 0 ? "fainted" : ""}"></span>`).join("")}</div>
+        </div>
+        <div class="nintendo-hp-row">
+          <span class="hp-badge">HP</span>
+          <div class="hp-track"><div class="hp-fill" style="width:${rPct}%;background:${rHpColor};"></div></div>
+          <span class="hp-num">${rightMon?.hp || 0}/${rightMon?.max_hp || 0} HP</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="battle-controls-grid" style="margin-top:12px;">
+      <div class="battle-actions-panel">
+        ${
+          st.status === "ongoing" && iAmFighter && leftMon
+            ? `
+            <h4>Chiêu thức (Lượt ${st.turn}) ${myActSubmitted ? `<span class="badge" style="background:#0284c7;">⏳ Đã chọn — Đang chờ ${escapeHtml(rightPlayer.username)}...</span>` : ""}</h4>
+            <div class="moves-grid">
+              ${leftMon.moves
+                .map(
+                  (m, idx) => `
+                  <button class="move-btn" ${myActSubmitted ? "disabled" : `onclick="submitPvpAction('move', ${idx})"`}>
+                    <div>
+                      <strong>${m.name}</strong><br />
+                      <small class="muted">Power ${m.power}</small>
+                    </div>
+                    <span class="type-badge t-${m.type}">${m.type}</span>
+                  </button>`
+                )
+                .join("")}
+            </div>
+            <h4 style="margin-top:10px;">Đổi Pokémon (${leftTeam.length} con)</h4>
+            <div class="switch-bar">
+              ${leftTeam
+                .map(
+                  (m, idx) => `
+                  <button class="switch-chip ${idx === leftIdx ? "active" : ""} ${m.hp <= 0 ? "fainted" : ""}"
+                    ${!myActSubmitted && idx !== leftIdx && m.hp > 0 ? `onclick="submitPvpAction('switch', ${idx})"` : "disabled"}>
+                    <img src="${spriteUrl(m.species_id, m.is_shiny)}" />
+                    <span>${m.name} (${m.hp}/${m.max_hp})</span>
+                  </button>`
+                )
+                .join("")}
+            </div>`
+            : st.status === "ongoing"
+            ? `<h4>👀 Đang theo dõi trận đấu — Lượt ${st.turn}</h4>
+               <p class="muted">Hai đấu thủ đang chọn chiêu thức. Mọi diễn biến sát thương cập nhật trực tiếp theo thời gian thực!</p>`
+            : `<div style="padding:12px;background:#1c2c6b;border:2px solid var(--gold);border-radius:10px;text-align:center;">
+                 <h3 style="margin:0 0 6px;color:var(--gold);">🏆 ${
+                   st.winner_user_id === currentUser.id
+                     ? "BẠN ĐÃ CHIẾN THẮNG PVP! (+350 Coins · +60 XP)"
+                     : `${escapeHtml((r.players.find((p) => p.user_id === st.winner_user_id) || {}).username || "Đấu thủ")} ĐÃ CHIẾN THẮNG!`
+                 }</h3>
+                 <button class="btn-primary btn-sm" onclick="leaveOnlineRoom()">Rời phòng</button>
+               </div>`
+        }
+      </div>
+      <div class="battle-log-panel">
+        <h4>Nhật ký PvP</h4>
+        <div class="battle-log" style="max-height:220px;">${(st.log || [])
+          .slice()
+          .reverse()
+          .map((l) => `<div>${escapeHtml(l)}</div>`)
+          .join("")}</div>
+      </div>
+    </div>
+  `;
+
   stage.innerHTML = bodyHtml;
+  const lImg = document.getElementById("pvp-left-sprite");
+  const rImg = document.getElementById("pvp-right-sprite");
+  if (lImg && leftMon) bindAnimatedSprite(lImg, leftMon.species_id, leftMon.is_shiny, true);
+  if (rImg && rightMon) bindAnimatedSprite(rImg, rightMon.species_id, rightMon.is_shiny, false);
+
+  if (lastPvpTurnVfx && st.turn > lastPvpTurnVfx && (st.last_events || []).length) {
+    const arenaEl = document.getElementById("pvp-battle-stage");
+    if (arenaEl) {
+      arenaEl.classList.remove("stage-quake");
+      void arenaEl.offsetWidth;
+      arenaEl.classList.add("stage-quake");
+    }
+    const lastEv = st.last_events[st.last_events.length - 1];
+    window.PokeAudio.playAttack(lastEv.move_type || "normal");
+  }
+  lastPvpTurnVfx = st.turn || 1;
+  lastPvpSpriteKey = arenaKey;
 }
 
 async function togglePvpReady() {
