@@ -1,15 +1,15 @@
 :root {
-  --bg: #0b1120;
-  --panel: #131c31;
-  --panel-alt: #1b2742;
-  --border: #2a3b63;
+  --bg: #172357;
+  --panel: #1f2e6e;
+  --panel-alt: #152154;
+  --border: #465da6;
   --text: #eef3ff;
-  --muted: #96a7cc;
-  --gold: #ffd166;
-  --green: #06d6a0;
-  --red: #ef476f;
+  --muted: #9eb0e0;
+  --gold: #facc15;
+  --green: #4ade80;
+  --red: #fb7185;
   --blue: #38bdf8;
-  --accent: #6366f1;
+  --accent: #4f46e5;
 }
 
 * { box-sizing: border-box; }
@@ -17,7 +17,7 @@ body {
   margin: 0;
   font-family: "Pixelify Sans", "Press Start 2P", "Courier New", monospace;
   letter-spacing: 0.02em;
-  background: radial-gradient(circle at top, #1f3264 0%, #0a1022 72%);
+  background: radial-gradient(circle at top, #273c8a 0%, #15204d 75%);
   color: var(--text);
   min-height: 100vh;
 }
@@ -583,3 +583,109 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .online-dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
 .online-dot.offline { background: #64748b; }
 .friend-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* PokéPath Indigo Console UI (Bag & Pokédex Inspector) */
+.pp-console {
+  background: #1a2866;
+  border: 2px solid #4d67b8;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: inset 0 0 24px rgba(10, 16, 48, 0.45);
+}
+.pp-region-tabs {
+  display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px;
+}
+.pp-region-btn {
+  background: #152154; border: 2px solid #4159a3; border-radius: 9px;
+  padding: 6px 12px; display: flex; flex-direction: column; align-items: center;
+  min-width: 72px; color: #dbeafe; box-shadow: none; font-size: 0.85rem; line-height: 1.15;
+}
+.pp-region-btn small { font-size: 0.72rem; color: #94a8de; }
+.pp-region-btn.active {
+  border-color: var(--gold); color: var(--gold); background: #22347d;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.25);
+}
+.pp-search-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;
+}
+.pp-search-input {
+  flex: 1; min-width: 210px; background: #141f4f; border: 2px solid #465ea8;
+  color: #fff; padding: 8px 14px; border-radius: 9px; font-family: inherit; font-size: 0.92rem;
+}
+.pp-select {
+  background: #141f4f; border: 2px solid #465ea8; color: #fff;
+  padding: 8px 12px; border-radius: 9px; font-family: inherit; font-size: 0.9rem; font-weight: 700;
+}
+.pp-count-label { font-weight: 700; color: #e2e8f0; font-size: 0.92rem; }
+.pp-random-btn {
+  background: #1a2968; border: 2px solid #e2e8f0; color: #fff;
+  border-radius: 9px; padding: 7px 14px; font-size: 0.88rem; box-shadow: none;
+}
+.pp-chip-row {
+  display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-bottom: 8px;
+}
+.pp-sort-label { color: var(--muted); font-size: 0.86rem; margin-right: 4px; font-weight: 700; }
+.pp-chip {
+  background: #142052; border: 2px solid #4159a3; color: #dbeafe;
+  border-radius: 999px; padding: 4px 12px; font-size: 0.82rem; box-shadow: none;
+}
+.pp-chip.active {
+  border-color: var(--gold); color: var(--gold); background: #233580;
+}
+.pp-grid-split {
+  display: grid; grid-template-columns: 1fr 330px; gap: 14px; align-items: start; margin-top: 10px;
+}
+@media (max-width: 980px) { .pp-grid-split { grid-template-columns: 1fr; } }
+.pp-tile-grid {
+  background: #142052; border: 2px solid #425aa6; border-radius: 12px;
+  padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 9px;
+  max-height: 620px; overflow-y: auto;
+}
+.pp-tile {
+  background: #1c2c6b; border: 2px solid #3c549e; border-radius: 10px;
+  padding: 8px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 4px; position: relative; transition: transform 0.12s, border-color 0.12s;
+}
+.pp-tile:hover { transform: translateY(-2px); border-color: #7c97e8; }
+.pp-tile.selected {
+  border-color: var(--gold); background: #263b8a;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.35);
+}
+.pp-tile-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.72rem; color: #9eb2e6; padding: 0 3px;
+}
+.pp-tile img.pp-sprite { width: 58px; height: 58px; image-rendering: pixelated; }
+.pp-tile.silhouette img.pp-sprite { filter: brightness(0) saturate(100%) opacity(0.58); }
+.pp-tile-name { font-size: 0.84rem; font-weight: 700; color: #fff; line-height: 1.1; }
+.pp-tile-ball { width: 15px; height: 15px; image-rendering: pixelated; }
+
+.pp-inspector {
+  background: #142052; border: 2px solid #4861ad; border-radius: 12px;
+  padding: 14px; position: sticky; top: 14px;
+}
+.pp-spotlight {
+  height: 184px; border-radius: 12px; border: 2px solid #4ade80;
+  background: radial-gradient(circle at center, rgba(74, 222, 128, 0.28) 0%, #091029 76%);
+  display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 12px;
+}
+.pp-spotlight img { width: 104px; height: 104px; image-rendering: pixelated; }
+.pp-spotlight.silhouette img { filter: brightness(0) saturate(100%) opacity(0.6); }
+.pp-spot-icons {
+  position: absolute; top: 8px; right: 8px; display: flex; gap: 6px;
+}
+.pp-spot-pill {
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(11, 18, 46, 0.85);
+  border: 1.5px solid #647cc4; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+}
+.pp-insp-head { text-align: center; margin-bottom: 10px; }
+.pp-insp-sub { font-size: 0.8rem; color: var(--muted); }
+.pp-insp-name { font-size: 1.25rem; font-weight: 800; color: #fff; margin: 2px 0 4px; }
+.pp-stat-list { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; }
+.pp-stat-row {
+  display: grid; grid-template-columns: 74px 1fr 44px; align-items: center; gap: 8px; font-size: 0.82rem;
+}
+.pp-stat-track { height: 9px; background: #0a1029; border-radius: 999px; overflow: hidden; border: 1px solid #2b3f82; }
+.pp-stat-fill { height: 100%; border-radius: 999px; transition: width 0.25s; }
+.pp-stat-val { text-align: right; font-weight: 700; }
+.pp-insp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }

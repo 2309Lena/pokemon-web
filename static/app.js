@@ -1333,73 +1333,244 @@ const SALVAGE_LABEL = {
   Mythic: "3 Vé Tím",
 };
 
+const TIER_BALL_ICON = {
+  Mythic: "/static/assets/items/master-ball.png",
+  Legendary: "/static/assets/items/master-ball.png",
+  Epic: "/static/assets/items/ultra-ball.png",
+  Rare: "/static/assets/items/great-ball.png",
+  Uncommon: "/static/assets/items/safari-ball.png",
+  Common: "/static/assets/items/poke-ball.png",
+};
+
+const GEN_REGIONS = [
+  { gen: "all", label: "All" },
+  { gen: "1", label: "Kanto" },
+  { gen: "2", label: "Johto" },
+  { gen: "3", label: "Hoenn" },
+  { gen: "4", label: "Sinnoh" },
+  { gen: "5", label: "Unova" },
+  { gen: "6", label: "Kalos" },
+  { gen: "7", label: "Alola" },
+  { gen: "8", label: "Galar" },
+  { gen: "9", label: "Paldea" },
+];
+
+const PP_TYPE_COLOR = {
+  grass: "#4ade80", fire: "#fb923c", water: "#38bdf8", electric: "#facc15",
+  ice: "#67e8f9", fighting: "#f87171", poison: "#c084fc", ground: "#fbbf24",
+  flying: "#818cf8", psychic: "#f472b6", bug: "#a3e635", rock: "#a8a29e",
+  ghost: "#a78bfa", dragon: "#6366f1", dark: "#94a3b8", steel: "#cbd5e1",
+  fairy: "#f9a8d4", normal: "#e2e8f0",
+};
+
+let bagState = { gen: "all", status: "all", rarity: "all", sort: "tier", selectedId: null };
+let dexState = { gen: "all", status: "all", rarity: "all", sort: "id", selectedId: null };
+
 function calcPokeDps(p) {
   const atk = p?.stats?.atk || 10;
   const spd = p?.stats?.spd || 10;
   return Math.round(atk * (1 + spd / 100));
 }
 
+function setBagFilter(key, val) {
+  bagState[key] = val;
+  renderMyPokemon();
+}
+
+function selectBagPokemon(id) {
+  bagState.selectedId = id;
+  renderMyPokemon();
+}
+
+function pickRandomBagPokemon() {
+  const items = window._lastBagList || [];
+  if (!items.length) return;
+  const pick = items[Math.floor(Math.random() * items.length)];
+  bagState.selectedId = pick.id;
+  renderMyPokemon();
+  playCry(pick.species_id);
+}
+
+function setDexFilter(key, val) {
+  dexState[key] = val;
+  renderPokedex();
+}
+
+function selectDexPokemon(id) {
+  dexState.selectedId = id;
+  renderPokedex();
+}
+
+function pickRandomDexPokemon() {
+  const items = window._lastDexList || [];
+  if (!items.length) return;
+  const pick = items[Math.floor(Math.random() * items.length)];
+  dexState.selectedId = pick.id;
+  renderPokedex();
+  playCry(pick.id);
+}
+
+function _statBarRow(label, val, maxVal, color) {
+  const pct = Math.max(6, Math.min(100, Math.round((val / maxVal) * 100)));
+  return `
+    <div class="pp-stat-row">
+      <span style="color:${color};font-weight:700;">${label}</span>
+      <div class="pp-stat-track"><div class="pp-stat-fill" style="width:${pct}%;background:${color};"></div></div>
+      <span class="pp-stat-val">${val}</span>
+    </div>`;
+}
+
 function renderMyPokemon() {
   if (!currentUser) return;
+  const allPokes = currentUser.pokemon || [];
   const q = (document.getElementById("bag-search")?.value || "").trim().toLowerCase();
-  const tierF = document.getElementById("bag-tier-filter")?.value || "all";
   const typeF = document.getElementById("bag-type-filter")?.value || "all";
-  const minDps = Number(document.getElementById("bag-dps-filter")?.value || 0);
-  const sortMode = document.getElementById("bag-sort-filter")?.value || "tier";
   const tierRank = { Mythic: 0, Legendary: 1, Epic: 2, Rare: 3, Uncommon: 4, Common: 5 };
 
+  // Count per species for duplicate badge & Keep-1 salvage
   const speciesCounts = {};
-  for (const p of currentUser.pokemon) {
-    speciesCounts[p.species_id] = (speciesCounts[p.species_id] || 0) + 1;
-  }
+  for (const p of allPokes) speciesCounts[p.species_id] = (speciesCounts[p.species_id] || 0) + 1;
 
-  const list = currentUser.pokemon
+  // Region Tabs with owned counts
+  document.getElementById("bag-gen-tabs").innerHTML = GEN_REGIONS.map((g) => {
+    const cnt = g.gen === "all" ? allPokes.length : allPokes.filter((p) => String(p.gen) === g.gen).length;
+    return `<button type="button" class="pp-region-btn ${bagState.gen === g.gen ? "active" : ""}" onclick="setBagFilter('gen','${g.gen}')"><strong>${g.label}</strong><small>${cnt}</small></button>`;
+  }).join("");
+
+  // Chips rows
+  const stOpts = [
+    ["all", "All"],
+    ["team", "Trong Đội"],
+    ["shiny", "✨ Shiny"],
+    ["dup", "♻️ Trùng"],
+    ["dps30", "DPS ≥ 30"],
+    ["dps80", "DPS ≥ 80"],
+    ["dps150", "DPS ≥ 150"],
+  ];
+  document.getElementById("bag-status-chips").innerHTML = stOpts
+    .map(([k, lbl]) => `<button type="button" class="pp-chip ${bagState.status === k ? "active" : ""}" onclick="setBagFilter('status','${k}')">${lbl}</button>`)
+    .join("");
+
+  const rarOpts = ["all", "Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common"];
+  document.getElementById("bag-rarity-chips").innerHTML = rarOpts
+    .map((r) => {
+      const ico = r === "all" ? "" : `<img class="pp-tile-ball" src="${TIER_BALL_ICON[r]}" />`;
+      return `<button type="button" class="pp-chip ${bagState.rarity === r ? "active" : ""}" onclick="setBagFilter('rarity','${r}')">${ico}${r === "all" ? "All Rarity" : r}</button>`;
+    })
+    .join("");
+
+  const sortOpts = [
+    ["tier", "Rarity"],
+    ["dps_desc", "DPS Cao"],
+    ["dps_asc", "DPS Thấp"],
+    ["lvl_desc", "Level"],
+    ["id", "No."],
+    ["name", "Name"],
+  ];
+  document.getElementById("bag-sort-chips").innerHTML =
+    `<span class="pp-sort-label">Sort:</span>` +
+    sortOpts
+      .map(([k, lbl]) => `<button type="button" class="pp-chip ${bagState.sort === k ? "active" : ""}" onclick="setBagFilter('sort','${k}')">${lbl}</button>`)
+      .join("");
+
+  const list = allPokes
     .filter((p) => {
-      if (tierF !== "all" && (p.tier || "Common") !== tierF) return false;
+      if (bagState.gen !== "all" && String(p.gen) !== bagState.gen) return false;
+      if (bagState.rarity !== "all" && (p.tier || "Common") !== bagState.rarity) return false;
       if (typeF !== "all" && !(p.types || []).includes(typeF)) return false;
-      if (minDps > 0 && calcPokeDps(p) < minDps) return false;
+      if (bagState.status === "team" && !p.team_slot_3 && !p.team_slot_6) return false;
+      if (bagState.status === "shiny" && !p.is_shiny) return false;
+      if (bagState.status === "dup" && (speciesCounts[p.species_id] || 1) <= 1) return false;
+      if (bagState.status === "dps30" && calcPokeDps(p) < 30) return false;
+      if (bagState.status === "dps80" && calcPokeDps(p) < 80) return false;
+      if (bagState.status === "dps150" && calcPokeDps(p) < 150) return false;
       if (q && !p.species_name.toLowerCase().includes(q) && String(p.species_id) !== q) return false;
       return true;
     })
     .slice()
     .sort((a, b) => {
-      if (sortMode === "dps_desc") return calcPokeDps(b) - calcPokeDps(a) || b.level - a.level;
-      if (sortMode === "dps_asc") return calcPokeDps(a) - calcPokeDps(b) || a.level - b.level;
-      if (sortMode === "lvl_desc") return b.level - a.level || calcPokeDps(b) - calcPokeDps(a);
-      if (sortMode === "atk_desc") return (b.stats?.atk || 0) - (a.stats?.atk || 0);
-      if (sortMode === "bst_desc") return (b.bst || 0) - (a.bst || 0);
+      if (bagState.sort === "dps_desc") return calcPokeDps(b) - calcPokeDps(a) || b.level - a.level;
+      if (bagState.sort === "dps_asc") return calcPokeDps(a) - calcPokeDps(b) || a.level - b.level;
+      if (bagState.sort === "lvl_desc") return b.level - a.level || calcPokeDps(b) - calcPokeDps(a);
+      if (bagState.sort === "id") return a.species_id - b.species_id || b.level - a.level;
+      if (bagState.sort === "name") return a.species_name.localeCompare(b.species_name);
       return (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) || calcPokeDps(b) - calcPokeDps(a);
     });
+
+  window._lastBagList = list;
+  document.getElementById("bag-count-label").textContent = `${list.length} Pokémon`;
+
+  let sel = list.find((p) => p.id === bagState.selectedId) || list[0] || null;
+  if (sel) bagState.selectedId = sel.id;
 
   document.getElementById("my-pokemon-grid").innerHTML = list.length
     ? list
         .map((p) => {
           const tier = p.tier || "Common";
-          const dps = calcPokeDps(p);
           const dupCnt = speciesCounts[p.species_id] || 1;
-          const safeName = (p.nickname || p.species_name || "").replace(/'/g, "\\'");
+          const isSel = sel && sel.id === p.id;
           return `
-      <div class="poke-card">
-        <div class="poke-card-top">
-          <span>#${p.species_id} · Lv.${p.level}</span>
-          ${tierBadgeHtml(tier)}
-        </div>
-        ${pokeImgTag(p.species_id, p.is_shiny, "poke-idle-anim")}
-        <strong>${p.is_shiny ? "✨ " : ""}${p.nickname} ${dupCnt > 1 ? `<small class="muted">(×${dupCnt})</small>` : ""}</strong>
-        <div class="type-row">${typeBadgesHtml(p.types)}</div>
-        <small class="muted">⚡ DPS <strong>${dps}</strong> · BST ${p.bst || "?"} · HP ${p.stats.max_hp} · ATK ${p.stats.atk} · SPD ${p.stats.spd}</small>
-        <div class="slot-actions">
-          <button class="btn-sm" onclick="quickAssign(${p.id}, 3)">+Đội 3</button>
-          <button class="btn-sm" onclick="quickAssign(${p.id}, 6)">+Đội 6</button>
-          <button class="btn-sm btn-gold" onclick="feedCandy(${p.id})"><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Candy</button>
-          ${p.can_evolve ? `<button class="btn-sm btn-green" onclick="evolvePoke(${p.id})">🧬 Tiến hóa</button>` : ""}
-          <button class="btn-sm btn-danger" onclick="salvagePokemon(${p.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "60 Coins"})</button>
-          ${dupCnt > 1 ? `<button class="btn-sm btn-gold" onclick="salvageKeepOneSpecies(${p.species_id}, '${safeName}', ${dupCnt - 1})">♻️ Tách hết (giữ 1)</button>` : ""}
-        </div>
-      </div>`;
+          <div class="pp-tile ${isSel ? "selected" : ""}" onclick="selectBagPokemon(${p.id})">
+            <div class="pp-tile-head">
+              <span>Lv.${p.level}</span>
+              <span>${p.team_slot_3 || p.team_slot_6 ? "👑" : ""}${p.is_shiny ? "✨" : ""}${dupCnt > 1 ? `×${dupCnt}` : ""}</span>
+            </div>
+            <img class="pp-sprite poke-idle-anim" src="${spriteUrl(p.species_id, p.is_shiny)}" alt="${p.species_name}" />
+            <div class="pp-tile-name">${p.nickname}</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <img class="pp-tile-ball" src="${TIER_BALL_ICON[tier] || TIER_BALL_ICON.Common}" />
+              <small style="color:#93c5fd;font-size:0.7rem;">⚡${calcPokeDps(p)}</small>
+            </div>
+          </div>`;
         })
         .join("")
     : `<div class="muted">Không có Pokémon nào khớp bộ lọc.</div>`;
+
+  // Right Inspector Spotlight
+  const insp = document.getElementById("bag-inspector");
+  if (!sel) {
+    insp.innerHTML = `<div class="empty-hint">Chọn một Pokémon bên trái để xem chỉ số & thao tác!</div>`;
+    return;
+  }
+  const tier = sel.tier || "Common";
+  const dps = calcPokeDps(sel);
+  const dupCnt = speciesCounts[sel.species_id] || 1;
+  const safeName = (sel.nickname || sel.species_name || "").replace(/'/g, "\\'");
+  const tColor = PP_TYPE_COLOR[(sel.types || [])[0]] || "#4ade80";
+  const regObj = GEN_REGIONS.find((g) => g.gen === String(sel.gen));
+  insp.innerHTML = `
+    <div class="pp-spotlight" style="border-color:${tColor};background:radial-gradient(circle at center, ${tColor}44 0%, #091029 76%);">
+      <div class="pp-spot-icons">
+        ${sel.is_shiny ? `<span class="pp-spot-pill" title="Shiny">✨</span>` : ""}
+        ${sel.team_slot_3 || sel.team_slot_6 ? `<span class="pp-spot-pill" title="Đang trong Đội Hình">👑</span>` : ""}
+        <button type="button" class="pp-spot-pill" onclick="playCry(${sel.species_id})" title="Nghe tiếng kêu">🔊</button>
+      </div>
+      ${pokeImgTag(sel.species_id, sel.is_shiny, "poke-idle-anim")}
+    </div>
+    <div class="pp-insp-head">
+      <div class="pp-insp-sub">N° ${String(sel.species_id).padStart(3, "0")} · ${regObj ? regObj.label : `Gen ${sel.gen}`} · Lv.${sel.level}</div>
+      <div class="pp-insp-name">${sel.is_shiny ? "✨ " : ""}${sel.nickname}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;">
+        <img class="pp-tile-ball" src="${TIER_BALL_ICON[tier] || TIER_BALL_ICON.Common}" />
+        ${tierBadgeHtml(tier)}
+      </div>
+      <div class="type-row" style="justify-content:center;">${typeBadgesHtml(sel.types)}</div>
+    </div>
+    <div class="pp-stat-list">
+      ${_statBarRow("HP", sel.stats.max_hp, 260, "#facc15")}
+      ${_statBarRow("DPS", dps, 240, "#4ade80")}
+      ${_statBarRow("Attack", sel.stats.atk, 160, "#fbbf24")}
+      ${_statBarRow("Defense", sel.stats.def, 160, "#fb7185")}
+      ${_statBarRow("Speed", sel.stats.spd, 160, "#4ade80")}
+    </div>
+    <div class="pp-insp-actions">
+      <button class="btn-sm" onclick="quickAssign(${sel.id}, 3)">+Đội 3</button>
+      <button class="btn-sm" onclick="quickAssign(${sel.id}, 6)">+Đội 6</button>
+      <button class="btn-sm btn-gold" onclick="feedCandy(${sel.id})"><img class="px-icon" src="/static/assets/items/rare-candy.png" /> Candy</button>
+      ${sel.can_evolve ? `<button class="btn-sm btn-green" onclick="evolvePoke(${sel.id})">🧬 Tiến hóa</button>` : `<button class="btn-sm" disabled>BST ${sel.bst}</button>`}
+      <button class="btn-sm btn-danger" style="grid-column:span 2;" onclick="salvagePokemon(${sel.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "60 Coins"})</button>
+      ${dupCnt > 1 ? `<button class="btn-sm btn-gold" style="grid-column:span 2;" onclick="salvageKeepOneSpecies(${sel.species_id}, '${safeName}', ${dupCnt - 1})">♻️ Tách hết ${dupCnt - 1} con trùng (giữ 1)</button>` : ""}
+    </div>`;
 }
 
 async function salvageKeepOneSpecies(speciesId, name, extraCount) {
@@ -1522,46 +1693,132 @@ async function loadPokedex() {
 }
 
 function renderPokedex() {
-  const q = (document.getElementById("dex-search")?.value || "").toLowerCase();
-  const tierF = document.getElementById("dex-tier-filter")?.value || "all";
-  const gen = document.getElementById("dex-gen-filter")?.value || "all";
+  if (!pokedexCache.length) return;
+  const q = (document.getElementById("dex-search")?.value || "").trim().toLowerCase();
   const typeF = document.getElementById("dex-type-filter")?.value || "all";
-  const sortMode = document.getElementById("dex-sort-filter")?.value || "id";
-  const exclOnly = document.getElementById("dex-excl-only")?.checked || false;
   const caughtSet = new Set(currentUser?.pokedex?.caught_ids || []);
+  const tierRank = { Mythic: 0, Legendary: 1, Epic: 2, Rare: 3, Uncommon: 4, Common: 5 };
+
+  document.getElementById("dex-gen-tabs").innerHTML = GEN_REGIONS.map((g) => {
+    const grp = g.gen === "all" ? pokedexCache : pokedexCache.filter((s) => String(s.gen) === g.gen);
+    const owned = grp.filter((s) => caughtSet.has(s.id)).length;
+    return `<button type="button" class="pp-region-btn ${dexState.gen === g.gen ? "active" : ""}" onclick="setDexFilter('gen','${g.gen}')"><strong>${g.label}</strong><small>${owned}/${grp.length}</small></button>`;
+  }).join("");
+
+  const stOpts = [
+    ["all", "All"],
+    ["owned", "Owned"],
+    ["missing", "Missing"],
+    ["excl", "⭐ Độc Quyền"],
+  ];
+  document.getElementById("dex-status-chips").innerHTML = stOpts
+    .map(([k, lbl]) => `<button type="button" class="pp-chip ${dexState.status === k ? "active" : ""}" onclick="setDexFilter('status','${k}')">${lbl}</button>`)
+    .join("");
+
+  const rarOpts = ["all", "Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common"];
+  document.getElementById("dex-rarity-chips").innerHTML = rarOpts
+    .map((r) => {
+      const ico = r === "all" ? "" : `<img class="pp-tile-ball" src="${TIER_BALL_ICON[r]}" />`;
+      return `<button type="button" class="pp-chip ${dexState.rarity === r ? "active" : ""}" onclick="setDexFilter('rarity','${r}')">${ico}${r === "all" ? "All Rarity" : r}</button>`;
+    })
+    .join("");
+
+  const sortOpts = [
+    ["id", "No."],
+    ["name", "Name"],
+    ["tier", "Rarity"],
+    ["bst_desc", "BST"],
+  ];
+  document.getElementById("dex-sort-chips").innerHTML =
+    `<span class="pp-sort-label">Sort:</span>` +
+    sortOpts
+      .map(([k, lbl]) => `<button type="button" class="pp-chip ${dexState.sort === k ? "active" : ""}" onclick="setDexFilter('sort','${k}')">${lbl}</button>`)
+      .join("");
 
   const filtered = pokedexCache
     .filter((s) => {
-      if (tierF !== "all" && (s.tier || "Common") !== tierF) return false;
-      if (gen !== "all" && String(s.gen) !== gen) return false;
+      if (dexState.gen !== "all" && String(s.gen) !== dexState.gen) return false;
+      if (dexState.rarity !== "all" && (s.tier || "Common") !== dexState.rarity) return false;
+      if (dexState.status === "owned" && !caughtSet.has(s.id)) return false;
+      if (dexState.status === "missing" && caughtSet.has(s.id)) return false;
+      if (dexState.status === "excl" && !s.exclusive_country_name) return false;
       if (typeF !== "all" && !(s.types || []).includes(typeF)) return false;
-      if (exclOnly && !s.exclusive_country_name) return false;
       if (q && !s.name.toLowerCase().includes(q) && String(s.id) !== q) return false;
       return true;
     })
-    .sort((a, b) => (sortMode === "bst_desc" ? (b.bst || 0) - (a.bst || 0) : a.id - b.id))
-    .slice(0, 80);
+    .sort((a, b) => {
+      if (dexState.sort === "name") return a.name.localeCompare(b.name);
+      if (dexState.sort === "tier") return (tierRank[a.tier] ?? 9) - (tierRank[b.tier] ?? 9) || a.id - b.id;
+      if (dexState.sort === "bst_desc") return (b.bst || 0) - (a.bst || 0);
+      return a.id - b.id;
+    });
 
-  document.getElementById("pokedex-grid").innerHTML = filtered
-    .map(
-      (s) => `
-      <div class="poke-card ${caughtSet.has(s.id) ? "caught" : ""}">
-        <div class="poke-card-top">
-          <span>#${s.id} · Gen ${s.gen}</span>
-          ${tierBadgeHtml(s.tier)}
-        </div>
-        ${pokeImgTag(s.id, false, "poke-idle-anim", s.name)}
-        <strong>${s.name} ${caughtSet.has(s.id) ? "✅" : ""}</strong>
-        <div class="type-row">${typeBadgesHtml(s.types)}</div>
-        <small class="muted">BST ${s.bst || "?"} · Tỉ lệ bắt ${s.capture_rate || "?"}</small>
-        ${
-          s.exclusive_country_name
-            ? `<span class="excl-badge">📍 Độc quyền: ${s.exclusive_country_name}</span>`
-            : ``
-        }
-      </div>`
-    )
-    .join("");
+  window._lastDexList = filtered;
+  document.getElementById("dex-count-label").textContent = `${filtered.length} Pokémon`;
+
+  const visible = filtered.slice(0, 120);
+  const sel = filtered.find((s) => s.id === dexState.selectedId) || visible[0] || null;
+  if (sel) dexState.selectedId = sel.id;
+
+  document.getElementById("pokedex-grid").innerHTML = visible.length
+    ? visible
+        .map((s) => {
+          const isOwned = caughtSet.has(s.id);
+          const tier = s.tier || "Common";
+          const isSel = sel && sel.id === s.id;
+          return `
+          <div class="pp-tile ${isSel ? "selected" : ""} ${isOwned ? "" : "silhouette"}" onclick="selectDexPokemon(${s.id})">
+            <div class="pp-tile-head">
+              <span>${s.id}</span>
+              <span>${isOwned ? "👑" : ""}</span>
+            </div>
+            <img class="pp-sprite" src="${spriteUrl(s.id, false)}" alt="${s.name}" />
+            <div class="pp-tile-name">${isOwned ? s.name : "???"}</div>
+            <img class="pp-tile-ball" src="${TIER_BALL_ICON[tier] || TIER_BALL_ICON.Common}" />
+          </div>`;
+        })
+        .join("")
+    : `<div class="muted">Không có loài nào khớp bộ lọc.</div>`;
+
+  const insp = document.getElementById("dex-inspector");
+  if (!sel) {
+    insp.innerHTML = `<div class="empty-hint">Chọn một loài để xem thông tin chi tiết!</div>`;
+    return;
+  }
+  const isOwned = caughtSet.has(sel.id);
+  const tier = sel.tier || "Common";
+  const tColor = PP_TYPE_COLOR[(sel.types || [])[0]] || "#4ade80";
+  const regObj = GEN_REGIONS.find((g) => g.gen === String(sel.gen));
+  const estDps = Math.round((sel.atk || 50) * (1 + (sel.spd || 50) / 100));
+  insp.innerHTML = `
+    <div class="pp-spotlight ${isOwned ? "" : "silhouette"}" style="border-color:${tColor};background:radial-gradient(circle at center, ${tColor}44 0%, #091029 76%);">
+      <div class="pp-spot-icons">
+        <span class="pp-spot-pill" title="${isOwned ? "Đã sở hữu" : "Chưa bắt"}">${isOwned ? "👑" : "❓"}</span>
+        <button type="button" class="pp-spot-pill" onclick="playCry(${sel.id})" title="Nghe tiếng kêu">🔊</button>
+      </div>
+      ${pokeImgTag(sel.id, false, isOwned ? "poke-idle-anim" : "")}
+    </div>
+    <div class="pp-insp-head">
+      <div class="pp-insp-sub">N° ${sel.id} · ${regObj ? regObj.label : `Gen ${sel.gen}`}</div>
+      <div class="pp-insp-name">${isOwned ? sel.name : `${sel.name} (Chưa bắt)`}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;">
+        <img class="pp-tile-ball" src="${TIER_BALL_ICON[tier] || TIER_BALL_ICON.Common}" />
+        ${tierBadgeHtml(tier)}
+      </div>
+      <div class="type-row" style="justify-content:center;">${typeBadgesHtml(sel.types)}</div>
+    </div>
+    <div class="pp-stat-list">
+      ${_statBarRow("HP", sel.hp || 50, 200, "#facc15")}
+      ${_statBarRow("Attack", sel.atk || 50, 180, "#fbbf24")}
+      ${_statBarRow("Defense", sel.def || 50, 180, "#fb7185")}
+      ${_statBarRow("Speed", sel.spd || 50, 180, "#4ade80")}
+      ${_statBarRow("Est DPS", estDps, 260, "#38bdf8")}
+    </div>
+    <div class="muted" style="text-align:center;font-size:0.82rem;margin-top:8px;">
+      BST ${sel.bst || "?"} · Tỉ lệ bắt ${sel.capture_rate || "?"}
+    </div>
+    ${sel.exclusive_country_name ? `<div style="text-align:center;margin-top:8px;"><span class="excl-badge">📍 Độc quyền: ${sel.exclusive_country_name}</span></div>` : ""}
+  `;
 }
 
 // ---------------- ONLINE PVP & TRADE ----------------

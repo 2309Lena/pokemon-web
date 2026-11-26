@@ -347,100 +347,13 @@
           <button id="subtab-dex-btn" onclick="switchTeamSubtab('dex')">📖 Pokédex Thế Giới (1,025 loài Gen 1–9)</button>
         </div>
 
-        <div id="team-bag-view">
-          <div class="filter-bar">
-            <input id="bag-search" type="text" placeholder="Tìm tên hoặc #ID..." oninput="renderMyPokemon()" />
-            <select id="bag-tier-filter" onchange="renderMyPokemon()">
-              <option value="all">Rarity: Tất cả</option>
-              <option value="Mythic">Mythic (Thần Thoại)</option>
-              <option value="Legendary">Legendary (Huyền Thoại)</option>
-              <option value="Epic">Epic (Sử Thi / Pseudo)</option>
-              <option value="Rare">Rare (Hiếm)</option>
-              <option value="Uncommon">Uncommon (Khá Phổ Biến)</option>
-              <option value="Common">Common (Đại Trà)</option>
-            </select>
-            <select id="bag-type-filter" onchange="renderMyPokemon()">
-              <option value="all">Hệ: Tất cả</option>
-              <option value="fire">Fire (Lửa)</option>
-              <option value="water">Water (Nước)</option>
-              <option value="grass">Grass (Cỏ)</option>
-              <option value="electric">Electric (Điện)</option>
-              <option value="ice">Ice (Băng)</option>
-              <option value="fighting">Fighting (Giác Đấu)</option>
-              <option value="poison">Poison (Độc)</option>
-              <option value="ground">Ground (Đất)</option>
-              <option value="flying">Flying (Bay)</option>
-              <option value="psychic">Psychic (Tâm Linh)</option>
-              <option value="bug">Bug (Bọ)</option>
-              <option value="rock">Rock (Đá)</option>
-              <option value="ghost">Ghost (Ma)</option>
-              <option value="dragon">Dragon (Rồng)</option>
-              <option value="dark">Dark (Bóng Tối)</option>
-              <option value="steel">Steel (Thép)</option>
-              <option value="fairy">Fairy (Tiên)</option>
-              <option value="normal">Normal (Thường)</option>
-            </select>
-            <select id="bag-dps-filter" onchange="renderMyPokemon()">
-              <option value="0">DPS: Tất cả</option>
-              <option value="15">DPS ≥ 15</option>
-              <option value="30">DPS ≥ 30</option>
-              <option value="60">DPS ≥ 60</option>
-              <option value="100">DPS ≥ 100</option>
-              <option value="150">DPS ≥ 150</option>
-            </select>
-            <select id="bag-sort-filter" onchange="renderMyPokemon()">
-              <option value="tier">Sắp xếp: Rarity (Mythic → Common)</option>
-              <option value="dps_desc">Sắp xếp: DPS Cao → Thấp</option>
-              <option value="dps_asc">Sắp xếp: DPS Thấp → Cao</option>
-              <option value="lvl_desc">Sắp xếp: Level Cao → Thấp</option>
-              <option value="atk_desc">Sắp xếp: ATK Cao → Thấp</option>
-              <option value="bst_desc">Sắp xếp: BST Cao → Thấp</option>
-            </select>
-          </div>
-          <div class="bulk-salvage-bar">
-            <div class="salvage-rates-info">
-              <img class="px-icon" src="/static/assets/ui/salvage.svg" alt="" />
-              <strong>Tách Pokémon:</strong>
-              <span>Common <b>60 Coins</b> · Uncommon <b>120 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
-            </div>
-            <div class="bulk-salvage-actions">
-              <button class="btn-sm btn-gold" onclick="bulkSalvageTier('duplicates')">♻️ Tách hết trùng (mỗi loài giữ 1)</button>
-              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Common')">Tách hết Common</button>
-              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Uncommon')">Tách hết Uncommon</button>
-              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Rare')">Tách hết Rare</button>
-              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Epic')">Tách hết Epic</button>
-              <small class="muted">(Tự giữ Pokémon trong đội hình & Shiny)</small>
-            </div>
-          </div>
-          <div id="my-pokemon-grid" class="pokemon-cards-grid"></div>
-        </div>
+        <div id="team-bag-view" class="pp-console">
+          <div class="pp-region-tabs" id="bag-gen-tabs"></div>
 
-        <div id="team-dex-view" class="hidden">
-          <div class="filter-bar">
-            <input id="dex-search" type="text" placeholder="Tìm tên hoặc #ID (vd: Pikachu, Rayquaza, 25)..." oninput="renderPokedex()" />
-            <select id="dex-tier-filter" onchange="renderPokedex()">
-              <option value="all">Tất cả Tier (Common → Mythic)</option>
-              <option value="Mythic">Mythic (23 loài)</option>
-              <option value="Legendary">Legendary (71 loài)</option>
-              <option value="Epic">Epic (146 loài)</option>
-              <option value="Rare">Rare (349 loài)</option>
-              <option value="Uncommon">Uncommon (206 loài)</option>
-              <option value="Common">Common (230 loài)</option>
-            </select>
-            <select id="dex-gen-filter" onchange="renderPokedex()">
-              <option value="all">Tất cả Gen (1–9)</option>
-              <option value="1">Gen 1 (Kanto)</option>
-              <option value="2">Gen 2 (Johto)</option>
-              <option value="3">Gen 3 (Hoenn)</option>
-              <option value="4">Gen 4 (Sinnoh)</option>
-              <option value="5">Gen 5 (Unova)</option>
-              <option value="6">Gen 6 (Kalos)</option>
-              <option value="7">Gen 7 (Alola)</option>
-              <option value="8">Gen 8 (Galar/Hisui)</option>
-              <option value="9">Gen 9 (Paldea)</option>
-            </select>
-            <select id="dex-type-filter" onchange="renderPokedex()">
-              <option value="all">Hệ: Tất cả</option>
+          <div class="pp-search-row">
+            <input id="bag-search" class="pp-search-input" type="text" placeholder="Search by name or #ID..." oninput="renderMyPokemon()" />
+            <select id="bag-type-filter" class="pp-select" onchange="renderMyPokemon()">
+              <option value="all">All types</option>
               <option value="fire">Fire</option>
               <option value="water">Water</option>
               <option value="grass">Grass</option>
@@ -460,13 +373,74 @@
               <option value="fairy">Fairy</option>
               <option value="normal">Normal</option>
             </select>
-            <select id="dex-sort-filter" onchange="renderPokedex()">
-              <option value="id">Sắp xếp: #ID</option>
-              <option value="bst_desc">Sắp xếp: BST / Sức mạnh giảm dần</option>
-            </select>
-            <label class="chk-inline"><input type="checkbox" id="dex-excl-only" onchange="renderPokedex()" /> Chỉ hiện Pokémon Độc Quyền Quốc Gia</label>
+            <span id="bag-count-label" class="pp-count-label">0 Pokémon</span>
+            <button type="button" class="pp-random-btn" onclick="pickRandomBagPokemon()">🎲 Random</button>
           </div>
-          <div id="pokedex-grid" class="pokemon-cards-grid"></div>
+
+          <div class="pp-chip-row" id="bag-status-chips"></div>
+          <div class="pp-chip-row" id="bag-rarity-chips"></div>
+          <div class="pp-chip-row" id="bag-sort-chips"></div>
+
+          <div class="bulk-salvage-bar">
+            <div class="salvage-rates-info">
+              <img class="px-icon" src="/static/assets/ui/salvage.svg" alt="" />
+              <strong>Tách Pokémon:</strong>
+              <span>Common <b>60 Coins</b> · Uncommon <b>120 Coins</b> · Rare <b>3 Vé Thường</b> · Epic <b>5 Vé Thường</b> · Legend <b>1 Vé Tím</b> · Mythic <b>3 Vé Tím</b></span>
+            </div>
+            <div class="bulk-salvage-actions">
+              <button class="btn-sm btn-gold" onclick="bulkSalvageTier('duplicates')">♻️ Tách hết trùng (mỗi loài giữ 1)</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Common')">Tách hết Common</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Uncommon')">Tách hết Uncommon</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Rare')">Tách hết Rare</button>
+              <button class="btn-sm btn-danger" onclick="bulkSalvageTier('Epic')">Tách hết Epic</button>
+              <small class="muted">(Tự giữ Đội hình & Shiny)</small>
+            </div>
+          </div>
+
+          <div class="pp-grid-split">
+            <div id="my-pokemon-grid" class="pp-tile-grid"></div>
+            <aside id="bag-inspector" class="pp-inspector"></aside>
+          </div>
+        </div>
+
+        <div id="team-dex-view" class="pp-console hidden">
+          <div class="pp-region-tabs" id="dex-gen-tabs"></div>
+
+          <div class="pp-search-row">
+            <input id="dex-search" class="pp-search-input" type="text" placeholder="Search by name or #ID..." oninput="renderPokedex()" />
+            <select id="dex-type-filter" class="pp-select" onchange="renderPokedex()">
+              <option value="all">All types</option>
+              <option value="fire">Fire</option>
+              <option value="water">Water</option>
+              <option value="grass">Grass</option>
+              <option value="electric">Electric</option>
+              <option value="ice">Ice</option>
+              <option value="fighting">Fighting</option>
+              <option value="poison">Poison</option>
+              <option value="ground">Ground</option>
+              <option value="flying">Flying</option>
+              <option value="psychic">Psychic</option>
+              <option value="bug">Bug</option>
+              <option value="rock">Rock</option>
+              <option value="ghost">Ghost</option>
+              <option value="dragon">Dragon</option>
+              <option value="dark">Dark</option>
+              <option value="steel">Steel</option>
+              <option value="fairy">Fairy</option>
+              <option value="normal">Normal</option>
+            </select>
+            <span id="dex-count-label" class="pp-count-label">1,025 Pokémon</span>
+            <button type="button" class="pp-random-btn" onclick="pickRandomDexPokemon()">🎲 Random</button>
+          </div>
+
+          <div class="pp-chip-row" id="dex-status-chips"></div>
+          <div class="pp-chip-row" id="dex-rarity-chips"></div>
+          <div class="pp-chip-row" id="dex-sort-chips"></div>
+
+          <div class="pp-grid-split">
+            <div id="pokedex-grid" class="pp-tile-grid"></div>
+            <aside id="dex-inspector" class="pp-inspector"></aside>
+          </div>
         </div>
       </section>
 
