@@ -233,6 +233,9 @@ def init_db():
         cur.execute("ALTER TABLE users ADD COLUMN tickets_x10 INTEGER NOT NULL DEFAULT 1")
     if "last_seen" not in cols:
         cur.execute("ALTER TABLE users ADD COLUMN last_seen REAL NOT NULL DEFAULT 0")
+    up_cols = {r["name"] for r in cur.execute("PRAGMA table_info(user_pokemon)").fetchall()}
+    if "plate_type" not in up_cols:
+        cur.execute("ALTER TABLE user_pokemon ADD COLUMN plate_type TEXT DEFAULT NULL")
     conn.commit()
     conn.close()
 
@@ -261,14 +264,50 @@ def calc_pokemon_stats(species_id, level, hp_iv=15, atk_iv=15, def_iv=15, spd_iv
     return {"max_hp": max_hp, "atk": atk, "def": dfn, "spd": spd}
 
 
+MULTITYPE_SPECIES = {493, 773}  # Arceus (Multitype) & Silvally (RKS System)
+
+PLATE_CATALOG = {
+    "normal": "Dạng Gốc (Normal)",
+    "fire": "Flame Plate (Lửa)",
+    "water": "Splash Plate (Nước)",
+    "grass": "Meadow Plate (Cỏ)",
+    "electric": "Zap Plate (Điện)",
+    "ice": "Icicle Plate (Băng)",
+    "fighting": "Fist Plate (Giác Đấu)",
+    "poison": "Toxic Plate (Độc)",
+    "ground": "Earth Plate (Đất)",
+    "flying": "Sky Plate (Bay)",
+    "psychic": "Mind Plate (Tâm Linh)",
+    "bug": "Insect Plate (Bọ)",
+    "rock": "Stone Plate (Đá)",
+    "ghost": "Spooky Plate (Ma)",
+    "dragon": "Draco Plate (Rồng)",
+    "dark": "Dread Plate (Bóng Tối)",
+    "steel": "Iron Plate (Thép)",
+    "fairy": "Pixie Plate (Tiên)",
+}
+
+
 def serialize_user_pokemon(row):
     d = dict(row)
     sp = POKEMON_BY_ID.get(d["species_id"], POKEMON_BY_ID[25])
     stats = calc_pokemon_stats(
         d["species_id"], d["level"], d["hp_iv"], d["atk_iv"], d["def_iv"], d["spd_iv"]
     )
+    is_mt = d["species_id"] in MULTITYPE_SPECIES
+    plate = d.get("plate_type")
+    active_types = list(sp["types"])
+    moves = build_moves_for_species(d["species_id"], POKEMON_BY_ID)
+    if is_mt and plate in PLATE_CATALOG and plate != "normal":
+        active_types = [plate]
+        if moves:
+            moves[0]["type"] = plate
+
     d["species_name"] = sp["name"]
-    d["types"] = sp["types"]
+    d["types"] = active_types
+    d["is_multitype"] = is_mt
+    d["plate_type"] = plate if (is_mt and plate in PLATE_CATALOG) else "normal"
+    d["plate_name"] = PLATE_CATALOG.get(d["plate_type"], PLATE_CATALOG["normal"])
     d["gen"] = sp["gen"]
     d["tier"] = sp.get("tier", "Common")
     d["bst"] = sp.get("bst", 300)
@@ -276,7 +315,7 @@ def serialize_user_pokemon(row):
     d["legendary"] = sp["legendary"]
     d["mythical"] = sp["mythical"]
     d["stats"] = stats
-    d["moves"] = build_moves_for_species(d["species_id"], POKEMON_BY_ID)
+    d["moves"] = moves
     d["xp_needed"] = pokemon_xp_needed(d["level"])
     d["can_evolve"] = bool(EVOLUTIONS_FORWARD.get(d["species_id"])) and d["level"] >= 12
     d["evolves_to"] = EVOLUTIONS_FORWARD.get(d["species_id"], [])

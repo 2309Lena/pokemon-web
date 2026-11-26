@@ -18,6 +18,8 @@ from battle import (
     start_wild_or_trainer_battle,
 )
 from db import (
+    MULTITYPE_SPECIES,
+    PLATE_CATALOG,
     authenticate_user,
     award_pokemon_xp,
     award_trainer_xp,
@@ -29,6 +31,7 @@ from db import (
     get_user_profile,
     init_db,
     pokemon_xp_needed,
+    serialize_user_pokemon,
     set_team_slot,
     touch_user_seen,
     unlock_country_for_user,
@@ -561,6 +564,50 @@ def api_pokemon_candy(uid):
         "pokemon": updated,
         "used": use_qty,
         "message": f"🍬 {updated['nickname']} tăng +{use_qty} cấp lên Lv.{updated['level']}!",
+        "user": get_user_profile(uid),
+    })
+
+
+@app.route("/api/pokemon/plate", methods=["POST"])
+@login_required
+def api_pokemon_plate(uid):
+    data = request.get_json(silent=True) or {}
+    poke_id = int(data.get("pokemon_id", 0))
+    plate_type = (data.get("plate_type") or "normal").strip().lower()
+    if plate_type not in PLATE_CATALOG:
+        return jsonify({"error": "Hệ Phiến Đá không hợp lệ."}), 400
+
+    conn = get_conn()
+    prow = conn.execute(
+        "SELECT * FROM user_pokemon WHERE id = ? AND user_id = ?", (poke_id, uid)
+    ).fetchone()
+    if not prow:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy Pokémon."}), 404
+    if prow["species_id"] not in MULTITYPE_SPECIES:
+        conn.close()
+        return jsonify({"error": "Chỉ Pokémon có đặc tính Đa Hệ (Arceus / Silvally) mới gắn được Phiến Đá!"}), 400
+    if (prow["plate_type"] or "normal") == plate_type:
+        conn.close()
+        return jsonify({"error": f"Pokémon đang mang {PLATE_CATALOG[plate_type]} rồi."}), 400
+
+    if plate_type != "normal":
+        conn.close()
+        if not change_item_qty(uid, "plate_stone", -1):
+            return jsonify({"error": "Bạn đã hết Phiến Đá Đa Hệ! Chỉ có thể nhận qua Quest Khó Hàng Tuần."}), 400
+        conn = get_conn()
+
+    conn.execute(
+        "UPDATE user_pokemon SET plate_type = ? WHERE id = ? AND user_id = ?",
+        (None if plate_type == "normal" else plate_type, poke_id, uid),
+    )
+    conn.commit()
+    updated_row = conn.execute("SELECT * FROM user_pokemon WHERE id = ?", (poke_id,)).fetchone()
+    conn.close()
+    updated = serialize_user_pokemon(updated_row)
+    return jsonify({
+        "pokemon": updated,
+        "message": f"🔮 {updated['nickname']} đã chuyển sang {PLATE_CATALOG[plate_type]}!",
         "user": get_user_profile(uid),
     })
 

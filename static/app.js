@@ -1204,6 +1204,7 @@ function renderMissions() {
       if (m.rewards.ultra_ball) rewParts.push(`+${m.rewards.ultra_ball} Ultra Ball`);
       if (m.rewards.master_ball) rewParts.push(`+${m.rewards.master_ball} Master Ball`);
       if (m.rewards.rare_candy) rewParts.push(`+${m.rewards.rare_candy} Rare Candy`);
+      if (m.rewards.plate_stone) rewParts.push(`+${m.rewards.plate_stone} 🔮 Phiến Đá Đa Hệ`);
       if (m.rewards.xp) rewParts.push(`+${m.rewards.xp} XP`);
 
       return `
@@ -1675,6 +1676,40 @@ function renderMyPokemon() {
         </div>
       </div>
       ${sel.can_evolve ? `<button class="btn-sm btn-green" style="grid-column:span 2;" onclick="evolvePoke(${sel.id})">🧬 Tiến hóa</button>` : `<button class="btn-sm" style="grid-column:span 2;" disabled>BST ${sel.bst}</button>`}
+      ${
+        sel.is_multitype
+          ? `<div style="grid-column:span 2;background:linear-gradient(145deg,#211c52,#16204d);border:1.5px solid #c084fc;border-radius:9px;padding:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;margin-bottom:5px;">
+                <span style="color:#e9d5ff;font-weight:700;">🔮 Phiến Đá Đa Hệ (Multitype)</span>
+                <strong style="color:#facc15;">Có: ${(currentUser.inventory && currentUser.inventory.plate_stone) || 0}</strong>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <select id="plate-type-select" class="pp-select" style="flex:1;padding:4px 8px;font-size:0.8rem;">
+                  <option value="dark">Dread Plate (Bóng Tối)</option>
+                  <option value="dragon">Draco Plate (Rồng)</option>
+                  <option value="fairy">Pixie Plate (Tiên)</option>
+                  <option value="fire">Flame Plate (Lửa)</option>
+                  <option value="water">Splash Plate (Nước)</option>
+                  <option value="grass">Meadow Plate (Cỏ)</option>
+                  <option value="electric">Zap Plate (Điện)</option>
+                  <option value="ice">Icicle Plate (Băng)</option>
+                  <option value="fighting">Fist Plate (Giác Đấu)</option>
+                  <option value="poison">Toxic Plate (Độc)</option>
+                  <option value="ground">Earth Plate (Đất)</option>
+                  <option value="flying">Sky Plate (Bay)</option>
+                  <option value="psychic">Mind Plate (Tâm Linh)</option>
+                  <option value="bug">Insect Plate (Bọ)</option>
+                  <option value="rock">Stone Plate (Đá)</option>
+                  <option value="ghost">Spooky Plate (Ma)</option>
+                  <option value="steel">Iron Plate (Thép)</option>
+                  <option value="normal">Tháo về Gốc (Normal - Miễn phí)</option>
+                </select>
+                <button class="btn-sm btn-primary" onclick="equipPlateStone(${sel.id})">🔮 Gắn Đá</button>
+              </div>
+              <small class="muted" style="font-size:0.7rem;">Hiện tại: ${sel.plate_name || "Gốc"} · Nhận đá qua Quest Khó Tuần</small>
+            </div>`
+          : ""
+      }
       <button class="btn-sm btn-danger" style="grid-column:span 2;" onclick="salvagePokemon(${sel.id}, '${safeName}', '${tier}')"><img class="px-icon" src="/static/assets/ui/salvage.svg" /> Tách (+${SALVAGE_LABEL[tier] || "25 Coins"})</button>
       ${dupCnt > 1 ? `<button class="btn-sm btn-gold" style="grid-column:span 2;" onclick="salvageKeepOneSpecies(${sel.species_id}, '${safeName}', ${dupCnt - 1})">♻️ Tách hết ${dupCnt - 1} con trùng (giữ 1)</button>` : ""}
     </div>`;
@@ -1797,6 +1832,23 @@ async function evolvePoke(pokeId) {
     renderTeamAndBag();
     window.PokeAudio.playCatchSuccess();
     toast(`🧬 Tiến hóa thành công thành ${data.pokemon.species_name}!`, "success");
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function equipPlateStone(pokeId) {
+  const plateType = document.getElementById("plate-type-select")?.value || "dark";
+  try {
+    const data = await api("/api/pokemon/plate", {
+      method: "POST",
+      body: JSON.stringify({ pokemon_id: pokeId, plate_type: plateType }),
+    });
+    currentUser = data.user;
+    updateHUD();
+    renderTeamAndBag();
+    window.PokeAudio.playCatchSuccess();
+    toast(data.message, "success");
   } catch (err) {
     toast(err.message, "error");
   }

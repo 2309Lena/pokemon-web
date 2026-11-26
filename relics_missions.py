@@ -128,6 +128,22 @@ MISSION_CATALOG = [
         "target": 3,
         "rewards": {"coins": 550, "tickets_x10": 2, "rare_candy": 2, "xp": 150},
     },
+    {
+        "id": "w_hard_wins",
+        "period": "weekly",
+        "title": "🔥 Quest Khó Tuần: Thắng 30 trận đấu",
+        "event": "battle_win",
+        "target": 30,
+        "rewards": {"coins": 650, "tickets_x10": 2, "plate_stone": 1, "xp": 180},
+    },
+    {
+        "id": "w_hard_cup",
+        "period": "weekly",
+        "title": "🔥 Quest Khó Tuần: Thắng 6 trận Grand Cup / PvP",
+        "event": "cup_or_pvp_win",
+        "target": 6,
+        "rewards": {"coins": 750, "tickets_x10": 3, "plate_stone": 1, "xp": 220},
+    },
     # MONTHLY MISSIONS
     {
         "id": "m_unlock_3",
@@ -368,7 +384,7 @@ def claim_mission_reward(user_id, mission_id):
     conn.commit()
     conn.close()
 
-    for item_k in ("poke_ball", "great_ball", "ultra_ball", "master_ball", "rare_candy"):
+    for item_k in ("poke_ball", "great_ball", "ultra_ball", "master_ball", "rare_candy", "plate_stone"):
         if rew.get(item_k):
             change_item_qty(user_id, item_k, rew[item_k])
 

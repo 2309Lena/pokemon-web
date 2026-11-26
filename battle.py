@@ -114,7 +114,7 @@ def fighter_from_user_pokemon(up, bonuses=None):
         "def": dfn,
         "spd": spd,
         "is_shiny": bool(up["is_shiny"]),
-        "moves": build_moves_for_species(up["species_id"]),
+        "moves": [dict(m) for m in (up.get("moves") or build_moves_for_species(up["species_id"]))],
     }
 
 
