@@ -113,6 +113,7 @@ def fighter_from_user_pokemon(up, bonuses=None):
         "atk": atk,
         "def": dfn,
         "spd": spd,
+        "dmg_dealt": 0,
         "is_shiny": bool(up["is_shiny"]),
         "moves": [dict(m) for m in (up.get("moves") or build_moves_for_species(up["species_id"]))],
     }
@@ -394,9 +395,26 @@ def _finish_battle_win(user_id, state):
             extra_msg += f" · +{drop_t10} 🎟️ ×10 Ticket"
 
     trainer_res = award_trainer_xp(user_id, xp, coins_gain=coins)
+    # --- Damage-based EXP split: top dmg +60%, 2nd +25%, lowest +15% ---
+    # Collect all player pokemon that participated (have user_pokemon_id)
+    participants = [pf for pf in state["player_team"] if pf.get("user_pokemon_id")]
+    if len(participants) >= 3:
+        sorted_by_dmg = sorted(participants, key=lambda x: x.get("dmg_dealt", 0), reverse=True)
+        exp_mults = {sorted_by_dmg[0]["user_pokemon_id"]: 1.60}
+        exp_mults[sorted_by_dmg[1]["user_pokemon_id"]] = 1.25
+        # All remaining (lowest) get 1.15
+        for pf in sorted_by_dmg[2:]:
+            exp_mults[pf["user_pokemon_id"]] = 1.15
+    elif len(participants) == 2:
+        sorted_by_dmg = sorted(participants, key=lambda x: x.get("dmg_dealt", 0), reverse=True)
+        exp_mults = {sorted_by_dmg[0]["user_pokemon_id"]: 1.60, sorted_by_dmg[1]["user_pokemon_id"]: 1.15}
+    else:
+        exp_mults = {pf["user_pokemon_id"]: 1.0 for pf in participants}
+
     for pf in state["player_team"]:
         if pf.get("user_pokemon_id"):
-            award_pokemon_xp(user_id, pf["user_pokemon_id"], poke_xp)
+            mult = exp_mults.get(pf["user_pokemon_id"], 1.0)
+            award_pokemon_xp(user_id, pf["user_pokemon_id"], int(poke_xp * mult))
 
     record_mission_event(user_id, "battle_win", 1)
     if mode == "cup":
@@ -557,6 +575,8 @@ def perform_battle_action(user_id, battle_id, action, param=None):
             nonlocal e
             dmg, eff, crit = calc_damage(p, e, pmove)
             e["hp"] = max(0, e["hp"] - dmg)
+            # Accumulate damage dealt for EXP split
+            p["dmg_dealt"] = p.get("dmg_dealt", 0) + dmg
             eff_txt = (
             " 💥 [SIÊU KHẮC ×4!]" if eff >= 4 else
             " 🔥 [KHẮC HỆ ×2!]" if eff >= 2 else
