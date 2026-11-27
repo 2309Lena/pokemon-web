@@ -198,6 +198,51 @@ function startVersionWatcher() {
   window.addEventListener("focus", checkAppVersion);
 }
 
+let pingPollTimer = null;
+let pingInFlight = false;
+
+async function measurePing() {
+  const hud = document.getElementById("ping-hud");
+  const txt = document.getElementById("ping-text");
+  if (!hud || !txt || pingInFlight) return;
+  pingInFlight = true;
+  const ctrl = new AbortController();
+  const abortId = setTimeout(() => ctrl.abort(), 5000);
+  const t0 = performance.now();
+  try {
+    const res = await fetch(`/api/ping?t=${Date.now()}`, {
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    clearTimeout(abortId);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const ms = Math.max(1, Math.round(performance.now() - t0));
+    txt.textContent = `Ping: ${ms} ms`;
+    hud.classList.remove("ping-good", "ping-warn", "ping-bad");
+    if (ms < 120) hud.classList.add("ping-good");
+    else if (ms < 300) hud.classList.add("ping-warn");
+    else hud.classList.add("ping-bad");
+  } catch (_) {
+    clearTimeout(abortId);
+    txt.textContent = "Ping: Offline";
+    hud.classList.remove("ping-good", "ping-warn", "ping-bad");
+    hud.classList.add("ping-bad");
+  } finally {
+    pingInFlight = false;
+  }
+}
+
+function startPingMonitor() {
+  measurePing();
+  clearInterval(pingPollTimer);
+  pingPollTimer = setInterval(() => {
+    if (!document.hidden) measurePing();
+  }, 4000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) measurePing();
+  });
+}
+
 async function api(url, opts = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
@@ -319,6 +364,7 @@ async function logout() {
 // ---------------- INIT & HUD ----------------
 async function bootstrap() {
   startVersionWatcher();
+  startPingMonitor();
   renderStarters();
   try {
     const me = await api("/api/me");

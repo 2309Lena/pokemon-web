@@ -227,6 +227,11 @@ def api_version():
     return jsonify({"version": get_app_ver()})
 
 
+@app.route("/api/ping")
+def api_ping():
+    return jsonify({"ok": True, "ts": int(time.time() * 1000)})
+
+
 @app.route("/api/register", methods=["POST"])
 def api_register():
     data = request.get_json(silent=True) or {}

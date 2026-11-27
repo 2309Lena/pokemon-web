@@ -638,6 +638,12 @@
     </div>
   </div>
 
+  <!-- LIVE PING HUD -->
+  <div id="ping-hud" class="ping-hud ping-good" onclick="measurePing()" title="Độ trễ kết nối tới máy chủ (bấm để đo lại)">
+    <span class="ping-dot"></span>
+    <span id="ping-text">Ping: -- ms</span>
+  </div>
+
   <script src="/static/vfx.js?v={{ asset_v }}"></script>
   <script src="/static/app.js?v={{ asset_v }}"></script>
 </body>
