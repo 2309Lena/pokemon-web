@@ -459,6 +459,7 @@ function initWorldZoomHandlers() {
   let pinchDist = 0;
 
   wrap.addEventListener("wheel", (e) => {
+    if (e.target.closest(".country-drawer, .map-zoom-controls")) return;
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.25 : 0.8;
     zoomWorldMap(factor, e.clientX, e.clientY);
@@ -611,13 +612,28 @@ function renderWorldSVG() {
   applyWorldViewBox();
 }
 
+let countryDrawerCollapsed = false;
+
+function toggleCountryDrawer() {
+  countryDrawerCollapsed = !countryDrawerCollapsed;
+  const drawer = document.getElementById("country-drawer");
+  if (!drawer) return;
+  drawer.classList.toggle("collapsed", countryDrawerCollapsed);
+  const btn = drawer.querySelector(".country-toggle-btn");
+  if (btn) btn.textContent = countryDrawerCollapsed ? "▲" : "▼";
+}
+
 function selectCountry(cid, redrawSvg = true) {
   if (worldDidDrag && redrawSvg) return;
   selectedCountryId = cid;
-  if (redrawSvg) renderWorldSVG();
+  if (redrawSvg) {
+    countryDrawerCollapsed = false;
+    renderWorldSVG();
+  }
   const c = worldCountries.find((x) => x.id === cid);
   if (!c) return;
   const drawer = document.getElementById("country-drawer");
+  drawer.classList.toggle("collapsed", countryDrawerCollapsed);
   const exclHtml = c.exclusive_pokemon
     .map(
       (p) => `
@@ -646,13 +662,20 @@ function selectCountry(cid, redrawSvg = true) {
     : `<button class="btn-gold full-w" onclick="unlockCountry('${c.id}')">🔓 Mở Khóa (-1 Open Point · Hiện có: ${currentUser.open_points})</button>`;
 
   drawer.innerHTML = `
-    <h3>${c.name}</h3>
-    <p class="muted">${c.continent} · ${c.biome_label} ${c.is_starter ? "· ⭐ Nước khởi đầu" : ""}</p>
-    ${actionBtn}
-    <h4 style="margin:14px 0 6px;">⭐ Pokémon Đặc Trưng (Chỉ xuất hiện tại ${c.name})</h4>
-    <div class="country-poke-list">${exclHtml}</div>
-    <h4 style="margin:10px 0 6px;">🌿 Loài hoang dã bản địa</h4>
-    <div class="country-poke-list">${localHtml}</div>
+    <div class="country-drawer-head">
+      <div>
+        <h3>${c.name}</h3>
+        <p class="muted country-drawer-sub">${c.continent} · ${c.biome_label} ${c.is_starter ? "· ⭐ Nước khởi đầu" : ""}</p>
+      </div>
+      <button type="button" class="btn-sm country-toggle-btn" onclick="toggleCountryDrawer()" title="Thu gọn / Mở rộng">${countryDrawerCollapsed ? "▲" : "▼"}</button>
+    </div>
+    <div class="country-drawer-body">
+      ${actionBtn}
+      <h4>⭐ Pokémon Đặc Trưng (${c.name})</h4>
+      <div class="country-poke-list">${exclHtml}</div>
+      <h4>🌿 Loài hoang dã bản địa</h4>
+      <div class="country-poke-list">${localHtml}</div>
+    </div>
   `;
 }
 

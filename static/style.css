@@ -174,9 +174,8 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .panel-header-row h2, .panel-header-row h3 { margin: 0; }
 
 /* World Map */
-.world-layout { display: grid; grid-template-columns: 1fr 360px; gap: 18px; align-items: start; }
-@media (max-width: 1050px) { .world-layout { grid-template-columns: 1fr; } }
-.world-map-card, .country-drawer, .rpg-stage-card, .explore-sidebar, .online-lobby-card, .online-room-stage {
+.world-layout { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+.world-map-card, .rpg-stage-card, .explore-sidebar, .online-lobby-card, .online-room-stage {
   background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
 }
 .continent-filters { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -199,9 +198,39 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 .map-zoom-controls button { min-width: 34px; height: 32px; padding: 0 8px; font-size: 1rem; font-weight: 800; }
 .zoom-badge { font-size: 0.78rem; color: var(--gold); font-weight: 700; min-width: 34px; text-align: center; }
 .map-mobile-hint {
-  position: absolute; left: 10px; bottom: 8px; z-index: 9; pointer-events: none;
+  position: absolute; right: 10px; bottom: 8px; z-index: 9; pointer-events: none;
   background: rgba(8, 13, 25, 0.78); color: var(--muted); border-radius: 6px;
   padding: 3px 8px; font-size: 0.74rem;
+}
+.country-drawer {
+  position: absolute; left: 12px; bottom: 12px; z-index: 12;
+  width: 350px; max-width: calc(100% - 24px); max-height: calc(100% - 24px);
+  overflow-y: auto; user-select: text;
+  background: rgba(11, 17, 32, 0.88); backdrop-filter: blur(8px);
+  border: 1px solid rgba(99, 130, 210, 0.45); border-radius: 14px;
+  padding: 12px 14px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+}
+.country-drawer-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.country-drawer-head h3 { margin: 0; font-size: 1.08rem; }
+.country-drawer-sub { margin: 2px 0 8px; font-size: 0.78rem; }
+.country-toggle-btn {
+  padding: 2px 8px; font-size: 0.78rem; line-height: 1.2; flex-shrink: 0;
+}
+.country-drawer.collapsed .country-drawer-sub { margin-bottom: 0; }
+.country-drawer.collapsed .country-drawer-body { display: none; }
+.country-drawer h4 { font-size: 0.82rem; margin: 9px 0 5px; }
+.country-drawer .country-poke-list { gap: 6px; margin: 0 0 4px; }
+.country-drawer .mini-poke-pill { padding: 4px 6px; font-size: 0.76rem; gap: 6px; border-radius: 8px; }
+.country-drawer .mini-poke-pill img { width: 28px; height: 28px; }
+@media (max-width: 760px) {
+  .map-mobile-hint { left: 10px; right: auto; }
+  .country-drawer {
+    position: static; width: 100%; max-width: 100%; max-height: none;
+    margin-top: 10px; background: #0d1526; backdrop-filter: none;
+    box-shadow: none; border-radius: 12px;
+  }
 }
 .country-path {
   fill: #24324d; stroke: #0a1220; stroke-width: 0.65; cursor: pointer;
