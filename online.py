@@ -7,10 +7,29 @@ from battle import calc_damage, fighter_from_user_pokemon
 from db import award_trainer_xp, get_conn, get_user_team, serialize_user_pokemon
 
 ROOM_IDLE_TIMEOUT = 180  # 3 phút (giây) không có hoạt động → tự xoá phòng
+_LAST_CLEANUP_TS = 0.0
+_COL_CHECKED = False
 
 
 def _gen_code():
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+def _ensure_last_activity_col(conn=None):
+    """Migration: thêm cột last_activity_at nếu chưa có (chạy 1 lần/process)."""
+    global _COL_CHECKED
+    if _COL_CHECKED:
+        return
+    own_conn = conn is None
+    if own_conn:
+        conn = get_conn()
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(online_rooms)").fetchall()]
+    if "last_activity_at" not in cols:
+        conn.execute("ALTER TABLE online_rooms ADD COLUMN last_activity_at REAL")
+        conn.commit()
+    _COL_CHECKED = True
+    if own_conn:
+        conn.close()
 
 
 def _touch_room(conn, room_id):
@@ -21,21 +40,38 @@ def _touch_room(conn, room_id):
     )
 
 
-def cleanup_idle_rooms():
+def cleanup_idle_rooms(force=False):
     """Đóng tất cả phòng waiting/in_progress không có hoạt động trong 3 phút.
-    Được gọi định kỳ bởi background thread trong app.py."""
-    cutoff = time.time() - ROOM_IDLE_TIMEOUT
+    Chạy lazy có throttle (tối đa 1 lần / 30s) để an toàn trên WSGI không dùng background thread."""
+    global _LAST_CLEANUP_TS
+    now = time.time()
+    if not force and now - _LAST_CLEANUP_TS < 30.0:
+        return
+    _LAST_CLEANUP_TS = now
+    cutoff = now - ROOM_IDLE_TIMEOUT
     conn = get_conn()
-    conn.execute(
+    _ensure_last_activity_col(conn)
+    # Chỉ chạy UPDATE nếu thực sự có phòng hết hạn để tránh write-lock SQLite vô ích
+    stale = conn.execute(
         """
-        UPDATE online_rooms
-        SET status = 'closed'
+        SELECT 1 FROM online_rooms
         WHERE status IN ('waiting', 'in_progress')
           AND COALESCE(last_activity_at, created_at) < ?
+        LIMIT 1
         """,
         (cutoff,),
-    )
-    conn.commit()
+    ).fetchone()
+    if stale:
+        conn.execute(
+            """
+            UPDATE online_rooms
+            SET status = 'closed'
+            WHERE status IN ('waiting', 'in_progress')
+              AND COALESCE(last_activity_at, created_at) < ?
+            """,
+            (cutoff,),
+        )
+        conn.commit()
     conn.close()
 
 
@@ -95,6 +131,7 @@ def _format_room(conn, r):
 
 
 def list_rooms():
+    cleanup_idle_rooms()
     conn = get_conn()
     rows = conn.execute(
         "SELECT * FROM online_rooms WHERE status != 'closed' ORDER BY id DESC LIMIT 30"
@@ -105,6 +142,7 @@ def list_rooms():
 
 
 def get_room(room_id):
+    cleanup_idle_rooms()
     conn = get_conn()
     r = conn.execute("SELECT * FROM online_rooms WHERE id = ?", (room_id,)).fetchone()
     if not r:
@@ -115,18 +153,8 @@ def get_room(room_id):
     return res
 
 
-def _ensure_last_activity_col():
-    """Migration: thêm cột last_activity_at nếu chưa có."""
-    conn = get_conn()
-    cols = [r["name"] for r in conn.execute("PRAGMA table_info(online_rooms)").fetchall()]
-    if "last_activity_at" not in cols:
-        conn.execute("ALTER TABLE online_rooms ADD COLUMN last_activity_at REAL")
-        conn.commit()
-    conn.close()
-
-
 def create_room(user_id, title, mode="pvp_3v3", max_slots=4):
-    _ensure_last_activity_col()
+    cleanup_idle_rooms()
     if mode not in ("pvp_3v3", "pvp_6v6", "trade"):
         return None, "Chế độ phòng không hợp lệ."
     max_slots = max(2, min(10, int(max_slots or 4)))
@@ -156,6 +184,7 @@ def create_room(user_id, title, mode="pvp_3v3", max_slots=4):
 
 
 def join_room(user_id, room_id_or_code):
+    cleanup_idle_rooms()
     conn = get_conn()
     if str(room_id_or_code).isdigit():
         r = conn.execute(

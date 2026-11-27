@@ -240,9 +240,16 @@ def init_db():
     conn.close()
 
 
+_LAST_SEEN_TS = {}
+
+
 def touch_user_seen(user_id):
+    now = time.time()
+    if now - _LAST_SEEN_TS.get(user_id, 0.0) < 20.0:
+        return
+    _LAST_SEEN_TS[user_id] = now
     conn = get_conn()
-    conn.execute("UPDATE users SET last_seen = ? WHERE id = ?", (time.time(), user_id))
+    conn.execute("UPDATE users SET last_seen = ? WHERE id = ?", (now, user_id))
     conn.commit()
     conn.close()
 

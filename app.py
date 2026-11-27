@@ -6,7 +6,6 @@ import hmac
 import os
 import secrets
 import subprocess
-import threading
 import time
 from functools import wraps
 
@@ -50,7 +49,6 @@ from friends_salvage import (
     send_friend_request,
 )
 from online import (
-    cleanup_idle_rooms,
     confirm_trade,
     create_room,
     get_room,
@@ -105,22 +103,6 @@ def _get_secret_key():
 
 app = Flask(__name__)
 app.secret_key = _get_secret_key()
-
-
-# ── Background: tự động dọn phòng idle mỗi 60 giây ──────────────────────────
-def _room_cleanup_loop():
-    """Chạy ngầm: cứ 60s quét và đóng các phòng không hoạt động > 3 phút."""
-    while True:
-        try:
-            cleanup_idle_rooms()
-        except Exception:
-            pass
-        time.sleep(60)
-
-
-_cleanup_thread = threading.Thread(target=_room_cleanup_loop, daemon=True)
-_cleanup_thread.start()
-# ─────────────────────────────────────────────────────────────────────────────
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
@@ -156,7 +138,7 @@ def _compute_asset_ver():
 
 def get_app_ver():
     now = time.time()
-    if now - _VER_CACHE["ts"] > 2.0:
+    if now - _VER_CACHE["ts"] > 15.0:
         _VER_CACHE["val"] = _compute_asset_ver()
         _VER_CACHE["ts"] = now
     return _VER_CACHE["val"]
@@ -170,7 +152,7 @@ def optimize_response(resp):
     ver = get_app_ver()
     if request.path == "/" or request.path.startswith("/api/"):
         resp.headers["X-App-Version"] = ver
-    if request.path in ("/", "/api/version"):
+    if request.path in ("/", "/api/version", "/api/ping"):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     elif request.path.startswith("/static/assets/") and resp.status_code == 200:
         resp.headers["Cache-Control"] = "public, max-age=86400"

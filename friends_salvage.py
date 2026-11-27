@@ -322,11 +322,25 @@ def create_pvp_invite(sender_id, target_username=None, friend_id=None, mode="pvp
     }, None
 
 
+_LAST_INVITE_EXPIRE_TS = 0.0
+
+
 def poll_pvp_invites(user_id):
+    global _LAST_INVITE_EXPIRE_TS
     now = time.time()
     conn = get_conn()
-    conn.execute("UPDATE pvp_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < ?", (now,))
-    conn.commit()
+    if now - _LAST_INVITE_EXPIRE_TS >= 20.0:
+        _LAST_INVITE_EXPIRE_TS = now
+        has_exp = conn.execute(
+            "SELECT 1 FROM pvp_invites WHERE status = 'pending' AND expires_at < ? LIMIT 1",
+            (now,),
+        ).fetchone()
+        if has_exp:
+            conn.execute(
+                "UPDATE pvp_invites SET status = 'expired' WHERE status = 'pending' AND expires_at < ?",
+                (now,),
+            )
+            conn.commit()
 
     inc = conn.execute(
         """

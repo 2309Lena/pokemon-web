@@ -191,7 +191,9 @@ async function checkAppVersion() {
 function startVersionWatcher() {
   stripUpdateParamIfPresent();
   clearInterval(versionPollTimer);
-  versionPollTimer = setInterval(checkAppVersion, 12000);
+  versionPollTimer = setInterval(() => {
+    if (!document.hidden) checkAppVersion();
+  }, 30000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) checkAppVersion();
   });
@@ -201,13 +203,28 @@ function startVersionWatcher() {
 let pingPollTimer = null;
 let pingInFlight = false;
 
-async function measurePing() {
+function updatePingHud(ms, ok = true) {
   const hud = document.getElementById("ping-hud");
   const txt = document.getElementById("ping-text");
-  if (!hud || !txt || pingInFlight) return;
+  if (!hud || !txt) return;
+  hud.classList.remove("ping-good", "ping-warn", "ping-bad");
+  if (!ok) {
+    txt.textContent = "Ping: Offline";
+    hud.classList.add("ping-bad");
+    return;
+  }
+  const cleanMs = Math.max(1, Math.round(ms));
+  txt.textContent = `Ping: ${cleanMs} ms`;
+  if (cleanMs < 150) hud.classList.add("ping-good");
+  else if (cleanMs < 380) hud.classList.add("ping-warn");
+  else hud.classList.add("ping-bad");
+}
+
+async function measurePing() {
+  if (pingInFlight) return;
   pingInFlight = true;
   const ctrl = new AbortController();
-  const abortId = setTimeout(() => ctrl.abort(), 5000);
+  const abortId = setTimeout(() => ctrl.abort(), 6000);
   const t0 = performance.now();
   try {
     const res = await fetch(`/api/ping?t=${Date.now()}`, {
@@ -216,17 +233,14 @@ async function measurePing() {
     });
     clearTimeout(abortId);
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const ms = Math.max(1, Math.round(performance.now() - t0));
-    txt.textContent = `Ping: ${ms} ms`;
-    hud.classList.remove("ping-good", "ping-warn", "ping-bad");
-    if (ms < 120) hud.classList.add("ping-good");
-    else if (ms < 300) hud.classList.add("ping-warn");
-    else hud.classList.add("ping-bad");
+    updatePingHud(performance.now() - t0, true);
+    const serverVer = res.headers.get("X-App-Version");
+    if (serverVer && CLIENT_APP_VERSION && serverVer !== CLIENT_APP_VERSION) {
+      triggerForceUpdateReload(serverVer);
+    }
   } catch (_) {
     clearTimeout(abortId);
-    txt.textContent = "Ping: Offline";
-    hud.classList.remove("ping-good", "ping-warn", "ping-bad");
-    hud.classList.add("ping-bad");
+    updatePingHud(0, false);
   } finally {
     pingInFlight = false;
   }
@@ -237,17 +251,19 @@ function startPingMonitor() {
   clearInterval(pingPollTimer);
   pingPollTimer = setInterval(() => {
     if (!document.hidden) measurePing();
-  }, 4000);
+  }, 12000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) measurePing();
   });
 }
 
 async function api(url, opts = {}) {
+  const t0 = performance.now();
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
+  updatePingHud(performance.now() - t0, true);
   const serverVer = res.headers.get("X-App-Version");
   if (serverVer && CLIENT_APP_VERSION && serverVer !== CLIENT_APP_VERSION) {
     triggerForceUpdateReload(serverVer);
@@ -2348,13 +2364,13 @@ async function leaveOnlineRoom() {
 function startOnlinePolling() {
   clearInterval(onlinePollTimer);
   onlinePollTimer = setInterval(async () => {
-    if (!currentOnlineRoom) return;
+    if (!currentOnlineRoom || document.hidden) return;
     try {
       const data = await api(`/api/online/rooms/${currentOnlineRoom.id}`);
       currentOnlineRoom = data.room;
       renderOnlineRoomStage();
     } catch (_) {}
-  }, 2200);
+  }, 2500);
 }
 
 let lastPvpSpriteKey = "";
@@ -2932,7 +2948,7 @@ let soloCountdownTimer = null;
 function startSoloInvitePolling() {
   clearInterval(soloInvitePollTimer);
   soloInvitePollTimer = setInterval(async () => {
-    if (!currentUser) return;
+    if (!currentUser || document.hidden) return;
     try {
       const data = await api("/api/friends/invites/poll");
       if (data.declined_invite) {
@@ -2945,7 +2961,7 @@ function startSoloInvitePolling() {
         hideSoloInviteModal();
       }
     } catch (_) {}
-  }, 2400);
+  }, 5000);
 }
 
 function showSoloInviteModal(inv) {
