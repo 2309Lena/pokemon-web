@@ -425,24 +425,25 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
 }
 .kecleon-speech {
   position: absolute;
-  left: 50%;
-  top: 25%;
+  left: 44.5%;
+  top: 23%;
   transform: translateX(-50%);
   background: #ffffff;
   color: #111827;
   border: 2.5px solid #1e293b;
   border-radius: 10px;
-  padding: 5px 12px;
-  font-size: 0.8rem;
+  padding: 4px 11px;
+  font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
   pointer-events: none;
+  z-index: 4;
 }
 .kecleon-speech::after {
   content: "";
   position: absolute;
-  left: 28%;
+  left: 38%;
   bottom: -7px;
   width: 10px;
   height: 10px;
@@ -450,6 +451,143 @@ button:active { transform: translateY(1px); box-shadow: inset 2px 2px 0 rgba(0,0
   border-right: 2.5px solid #1e293b;
   border-bottom: 2.5px solid #1e293b;
   transform: rotate(45deg);
+}
+
+/* Surprised Pikachu Shopkeeper behind counter */
+.pikacues-keeper-slot {
+  position: absolute;
+  left: 41.5%;
+  bottom: 36.2%;
+  width: 7.8%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.pikacues-pika-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform-origin: bottom center;
+  transform: translateY(15%);
+  animation: pikaSurprisedIdle 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+}
+.pikacues-pika-img.pika-shock-pop {
+  animation: pikaShockPop 0.45s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+}
+@keyframes pikaSurprisedIdle {
+  0%, 100% { transform: translateY(15%) scale(1, 1) rotate(0deg); }
+  50% { transform: translateY(12%) scale(1.03, 0.97) rotate(-1.5deg); }
+}
+@keyframes pikaShockPop {
+  0% { transform: translateY(15%) scale(1); }
+  35% { transform: translateY(-2%) scale(1.18, 1.12) rotate(-4deg); }
+  70% { transform: translateY(12%) scale(0.96, 1.04) rotate(3deg); }
+  100% { transform: translateY(15%) scale(1); }
+}
+
+/* Toothless-Meme Dancing Charizard Stage */
+.pikacues-charizard-stage {
+  position: absolute;
+  left: 72%;
+  bottom: 6%;
+  width: 13.8%;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  z-index: 5;
+  user-select: none;
+}
+.charizard-dance-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  width: 58%;
+  height: 12%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  transform: translateX(-50%);
+  animation: toothlessShadow 1.38s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.charizard-dance-sprite {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-image: url('/static/assets/ui/charizard_dance_strip.png');
+  background-repeat: no-repeat;
+  background-size: 600% 100%;
+  image-rendering: pixelated;
+  transform-origin: bottom center;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+  animation:
+    toothlessFrames 1.38s steps(6) infinite,
+    toothlessBounce 1.38s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.pikacues-charizard-stage.music-on .charizard-dance-sprite {
+  filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.75)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+}
+@keyframes toothlessFrames {
+  from { background-position: 0% 0%; }
+  to { background-position: 120% 0%; }
+}
+@keyframes toothlessBounce {
+  0%   { transform: translate(-4%, -3%) scale(1.02, 0.98) rotate(-5deg); }
+  16.6% { transform: translate(0%, 3%)  scale(1.08, 0.90) rotate(0deg); }
+  33.3% { transform: translate(4%, -3%) scale(1.02, 0.98) rotate(5deg); }
+  50%   { transform: translate(0%, 3%)  scale(1.08, 0.90) rotate(0deg); }
+  66.6% { transform: translate(0%, -14%) scale(0.95, 1.07) rotate(-2deg); }
+  83.3% { transform: translate(0%, 2%)  scale(1.06, 0.92) rotate(2deg); }
+  100%  { transform: translate(-4%, -3%) scale(1.02, 0.98) rotate(-5deg); }
+}
+@keyframes toothlessShadow {
+  0%, 33.3%, 100% { transform: translateX(-50%) scale(0.96, 1); opacity: 0.4; }
+  16.6%, 50%, 83.3% { transform: translateX(-50%) scale(1.12, 1.05); opacity: 0.52; }
+  66.6% { transform: translateX(-50%) scale(0.68, 0.8); opacity: 0.26; }
+}
+.dance-note {
+  position: absolute;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #fde047;
+  text-shadow: 0 2px 0 #1e293b, 0 0 8px rgba(250, 204, 21, 0.7);
+  pointer-events: none;
+  opacity: 0;
+}
+.dance-note-1 { left: 8%; top: 10%; animation: floatNoteL 1.38s ease-out infinite; }
+.dance-note-2 { right: 6%; top: 4%; color: #38bdf8; animation: floatNoteR 1.38s ease-out 0.45s infinite; }
+.dance-note-3 { left: 48%; top: -4%; color: #f472b6; animation: floatNoteL 1.38s ease-out 0.9s infinite; }
+@keyframes floatNoteL {
+  0% { transform: translate(0, 8px) scale(0.6) rotate(-12deg); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(-12px, -26px) scale(1.15) rotate(12deg); opacity: 0; }
+}
+@keyframes floatNoteR {
+  0% { transform: translate(0, 8px) scale(0.6) rotate(12deg); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(12px, -28px) scale(1.15) rotate(-12deg); opacity: 0; }
+}
+.charizard-music-pill {
+  position: absolute;
+  left: 50%;
+  top: -18%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  color: #fde047;
+  border: 1.5px solid #facc15;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pikacues-charizard-stage.music-on .charizard-music-pill {
+  background: #facc15;
+  color: #111827;
 }
 .kecleon-sign-overlay {
   position: absolute;

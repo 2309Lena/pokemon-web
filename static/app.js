@@ -1465,7 +1465,102 @@ async function claimMission(mid) {
   }
 }
 
-// ---------------- KECLEON SHOP & TCG PACKS ----------------
+// ---------------- PIKACUES SHOP & TCG PACKS ----------------
+const PIKA_LINES = [
+  "Pika?! :o Mua đồ đi nè!",
+  "Pika-pika!! Giá hời bất ngờ :o",
+  "Ủa bạn giàu dữ vậy?! :o",
+  "Chào mừng đến Pikacues! ⚡",
+];
+
+function pokeShopPikachu(customText = null) {
+  const img = document.getElementById("pikacues-pika-img");
+  const sp = document.getElementById("pikacues-speech");
+  if (img) {
+    img.classList.remove("pika-shock-pop");
+    void img.offsetWidth;
+    img.classList.add("pika-shock-pop");
+  }
+  if (sp) {
+    sp.textContent = customText || PIKA_LINES[Math.floor(Math.random() * PIKA_LINES.length)];
+  }
+  try { playCry(25); } catch (_) {}
+}
+
+let charizardDanceAudioTimer = null;
+let charizardDanceCtx = null;
+
+function stopCharizardMemeMusic() {
+  clearInterval(charizardDanceAudioTimer);
+  charizardDanceAudioTimer = null;
+  const st = document.getElementById("charizard-dance-stage");
+  const pill = document.getElementById("charizard-music-pill");
+  if (st) st.classList.remove("music-on");
+  if (pill) pill.textContent = "🎵 Click nhảy!";
+}
+
+function toggleCharizardMemeMusic() {
+  if (charizardDanceAudioTimer) {
+    stopCharizardMemeMusic();
+    return;
+  }
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!charizardDanceCtx) charizardDanceCtx = new AudioCtx();
+    if (charizardDanceCtx.state === "suspended") charizardDanceCtx.resume();
+  } catch (_) {
+    return;
+  }
+  const st = document.getElementById("charizard-dance-stage");
+  const pill = document.getElementById("charizard-music-pill");
+  if (st) st.classList.add("music-on");
+  if (pill) pill.textContent = "🎶 Đang quẩy!";
+
+  // Driftveil-inspired bouncy 8-bit chiptune loop (130 BPM -> 230ms per beat)
+  const melody = [523.25, 0, 587.33, 659.25, 783.99, 659.25, 587.33, 523.25, 440.0, 0, 523.25, 587.33, 659.25, 523.25, 440.0, 392.0];
+  const bass = [130.81, 196.0, 146.83, 220.0, 164.81, 246.94, 146.83, 196.0];
+  let step = 0;
+
+  const playStep = () => {
+    const shopView = document.getElementById("packshop-main-view");
+    const packsPanel = document.getElementById("panel-packs");
+    if (!shopView || shopView.classList.contains("hidden") || !packsPanel || !packsPanel.classList.contains("active")) {
+      stopCharizardMemeMusic();
+      return;
+    }
+    const ctx = charizardDanceCtx;
+    const now = ctx.currentTime;
+    const freq = melody[step % melody.length];
+    if (freq > 0) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.setValueAtTime(freq, now);
+      g.gain.setValueAtTime(0.045, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(now);
+      o.stop(now + 0.2);
+    }
+    const bFreq = bass[step % bass.length];
+    const bo = ctx.createOscillator();
+    const bg = ctx.createGain();
+    bo.type = "triangle";
+    bo.frequency.setValueAtTime(bFreq, now);
+    bg.gain.setValueAtTime(0.06, now);
+    bg.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    bo.connect(bg);
+    bg.connect(ctx.destination);
+    bo.start(now);
+    bo.stop(now + 0.19);
+    step++;
+  };
+
+  playStep();
+  charizardDanceAudioTimer = setInterval(playStep, 230);
+}
+
 function switchKecleonTab(tab) {
   const isItems = tab === "items";
   document.getElementById("kshop-tab-items")?.classList.toggle("active", isItems);
@@ -1586,6 +1681,7 @@ async function buyShopItem(key, qty = 1) {
     currentUser = data.user;
     updateHUD();
     loadPacksAndShop();
+    pokeShopPikachu("Pika?! Cảm ơn nha :o ⚡");
     toast(data.message, "success");
   } catch (err) {
     toast(err.message, "error");

@@ -261,7 +261,7 @@
             <h2 class="pixel-h2">Gacha & Shop</h2>
             <div class="sub-tabs-bar" style="margin:0;">
               <button class="active" id="subtab-gacha-btn" onclick="switchGachaSubtab('gacha')"><img class="px-icon" src="/static/assets/ui/ticket_gold.png" alt="" /> Region Gacha</button>
-              <button id="subtab-packshop-btn" onclick="switchGachaSubtab('packshop')"><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> Kecleon Shop</button>
+              <button id="subtab-packshop-btn" onclick="switchGachaSubtab('packshop')"><img class="px-icon" src="/static/assets/ui/pikachu_surprised.png" alt="" /> Pikacues</button>
             </div>
           </div>
         </div>
@@ -280,19 +280,34 @@
           <div id="gacha-reveal-modal" class="pack-reveal-stage hidden" style="margin-top:18px;"></div>
         </div>
 
-        <!-- KECLEON SHOP VIEW -->
+        <!-- PIKACUES SHOP VIEW -->
         <div id="packshop-main-view" class="hidden">
           <div class="kecleon-shop-shell">
             <div class="kecleon-banner-wrap">
-              <img class="kecleon-banner-img" src="/static/assets/ui/kecleon_shop_banner.png" alt="Kecleon Shop" />
-              <div class="kecleon-speech">Xin chào! Cứ xem thoải mái nhé!</div>
-              <div class="kecleon-sign-overlay">Kecleon Shop</div>
+              <img class="kecleon-banner-img" src="/static/assets/ui/pikacues_shop_bg.png" alt="Pikacues Shop" />
+              <!-- Surprised Pikachu Keeper behind counter -->
+              <div class="pikacues-keeper-slot" onclick="pokeShopPikachu()" title="Bấm vào Pikachu :o">
+                <img id="pikacues-pika-img" class="pikacues-pika-img" src="/static/assets/ui/pikachu_surprised.png" alt="Surprised Pikachu" />
+              </div>
+              <div class="kecleon-speech" id="pikacues-speech">Pika?! :o Mua đồ đi nè!</div>
+
+              <!-- Toothless-Meme Dancing Charizard beside shop -->
+              <div class="pikacues-charizard-stage" id="charizard-dance-stage" onclick="toggleCharizardMemeMusic()" title="Bấm để bật/tắt nhạc nhảy Toothless Meme!">
+                <span class="dance-note dance-note-1">♪</span>
+                <span class="dance-note dance-note-2">♫</span>
+                <span class="dance-note dance-note-3">♬</span>
+                <div class="charizard-dance-shadow"></div>
+                <div class="charizard-dance-sprite"></div>
+                <div class="charizard-music-pill" id="charizard-music-pill">🎵 Click nhảy!</div>
+              </div>
+
+              <div class="kecleon-sign-overlay">Pikacues</div>
             </div>
             <div class="kecleon-shop-panel">
               <div class="kecleon-panel-head">
                 <div>
-                  <h2 class="kecleon-title">Kecleon Shop</h2>
-                  <p class="kecleon-subtitle">Chào mừng! Vật phẩm bạn mua sẽ được cất thẳng vào Túi Đồ.</p>
+                  <h2 class="kecleon-title">Pikacues</h2>
+                  <p class="kecleon-subtitle">Chào mừng đến Pikacues! Vật phẩm bạn mua sẽ được cất thẳng vào Túi Đồ.</p>
                 </div>
               </div>
               <div class="kecleon-tabs-row">
