@@ -13,9 +13,11 @@
 }
 
 * { box-sizing: border-box; }
+html { font-size: 18px; }
 body {
   margin: 0;
   font-family: "Pixelify Sans", "Press Start 2P", "Courier New", monospace;
+  font-size: 1rem;
   letter-spacing: 0.02em;
   background: radial-gradient(circle at top, #273c8a 0%, #15204d 75%);
   color: var(--text);
@@ -32,6 +34,7 @@ hr.sep { border: none; border-top: 2px dashed var(--border); margin: 28px 0; }
 /* 8-bit Pixel Buttons */
 button {
   font-family: "Pixelify Sans", monospace;
+  font-size: 0.95rem;
   cursor: pointer;
   border: 2px solid #090e1c;
   border-radius: 5px;
