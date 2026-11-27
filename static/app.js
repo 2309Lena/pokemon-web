@@ -1465,7 +1465,21 @@ async function claimMission(mid) {
   }
 }
 
-// ---------------- TCG PACK SHOP & POKEMART ----------------
+// ---------------- KECLEON SHOP & TCG PACKS ----------------
+function switchKecleonTab(tab) {
+  const isItems = tab === "items";
+  document.getElementById("kshop-tab-items")?.classList.toggle("active", isItems);
+  document.getElementById("kshop-tab-packs")?.classList.toggle("active", !isItems);
+  document.getElementById("kshop-items-pane")?.classList.toggle("hidden", !isItems);
+  document.getElementById("kshop-packs-pane")?.classList.toggle("hidden", isItems);
+  const tip = document.getElementById("kshop-tip");
+  if (tip) {
+    tip.textContent = isItems
+      ? "💡 Bấm nút tiền Vàng để mua ×1 hoặc chọn nhanh ×10 / ×100 cho Bóng, Thuốc & Vé Gacha."
+      : "✨ Mỗi Booster Pack mở ra 5 thẻ Pokémon ngẫu nhiên theo chủ đề — thẻ trùng tự đổi thành Stardust!";
+  }
+}
+
 async function loadPacksAndShop() {
   const data = await api("/api/packs");
   packsCatalog = data.packs;
@@ -1481,7 +1495,7 @@ async function loadPacksAndShop() {
           <p style="font-size:0.82rem; color:#e2e8f0; margin:0;">${pk.subtitle}</p>
         </div>
         <img class="cover" src="${spriteUrl(pk.cover_id)}" alt="${pk.name}" />
-        <button class="btn-gold full-w" onclick="openPack('${pk.id}')">🃏 Mở Pack · 🪙 ${pk.price.toLocaleString()}</button>
+        <button class="kshop-price-btn full-w" onclick="openPack('${pk.id}')"><img src="/static/assets/ui/coin.svg" alt="" /> ${pk.price.toLocaleString()} · Mở Pack</button>
       </div>`
     )
     .join("");
@@ -1496,19 +1510,24 @@ async function loadPacksAndShop() {
           : (currentUser.inventory && currentUser.inventory[it.key]) || 0;
       const ico = it.icon || "/static/assets/items/poke-ball.png";
       return `
-      <div class="mart-card">
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <img class="px-icon lg" src="${ico}" alt="${it.name}" />
-            <strong>${it.name}</strong>
-          </div>
-          <p class="muted" style="margin:4px 0;">${it.desc}</p>
-          <small>Trong túi: <strong>${owned}</strong> · Đơn giá: <strong>${it.price.toLocaleString()}</strong> Coins</small>
+      <div class="kshop-card">
+        <div class="kshop-icon-wrap">
+          <img src="${ico}" alt="${it.name}" />
         </div>
-        <div class="mart-buy-row" style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn-primary btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 1)">Mua ×1</button>
-          <button class="btn-gold btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 10)">×10 (${(it.price * 10).toLocaleString()})</button>
-          <button class="btn-green btn-sm" style="flex:1;" onclick="buyShopItem('${it.key}', 100)">×100 (${(it.price * 100).toLocaleString()})</button>
+        <div class="kshop-info">
+          <div class="kshop-name">${it.name}</div>
+          <div class="kshop-desc">${it.desc}</div>
+          <div class="kshop-owned">Trong túi: ${owned.toLocaleString()}</div>
+        </div>
+        <div class="kshop-buy-col">
+          <button class="kshop-price-btn" onclick="buyShopItem('${it.key}', 1)" title="Mua ×1">
+            <img src="/static/assets/ui/coin.svg" alt="" />
+            <span>${it.price.toLocaleString()}</span>
+          </button>
+          <div class="kshop-bulk-row">
+            <button type="button" class="kshop-bulk-btn" onclick="buyShopItem('${it.key}', 10)" title="Mua ×10 (${(it.price * 10).toLocaleString()} Coins)">×10</button>
+            <button type="button" class="kshop-bulk-btn" onclick="buyShopItem('${it.key}', 100)" title="Mua ×100 (${(it.price * 100).toLocaleString()} Coins)">×100</button>
+          </div>
         </div>
       </div>`;
     })

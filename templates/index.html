@@ -258,13 +258,12 @@
       <section id="panel-packs" class="tab-panel">
         <div class="gacha-header-bar">
           <div class="gacha-brand">
-            <h2 class="pixel-h2">Gacha</h2>
+            <h2 class="pixel-h2">Gacha & Shop</h2>
             <div class="sub-tabs-bar" style="margin:0;">
               <button class="active" id="subtab-gacha-btn" onclick="switchGachaSubtab('gacha')"><img class="px-icon" src="/static/assets/ui/ticket_gold.png" alt="" /> Region Gacha</button>
-              <button id="subtab-packshop-btn" onclick="switchGachaSubtab('packshop')"><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> TCG Booster & Mart</button>
+              <button id="subtab-packshop-btn" onclick="switchGachaSubtab('packshop')"><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> Kecleon Shop</button>
             </div>
           </div>
-          <button class="btn-sm" onclick="switchTab('world')">Back</button>
         </div>
 
         <!-- GACHA VIEW (matching reference layout) -->
@@ -281,13 +280,36 @@
           <div id="gacha-reveal-modal" class="pack-reveal-stage hidden" style="margin-top:18px;"></div>
         </div>
 
-        <!-- TCG PACKS + POKEMART VIEW -->
+        <!-- KECLEON SHOP VIEW -->
         <div id="packshop-main-view" class="hidden">
-          <div id="pack-reveal-stage" class="pack-reveal-stage hidden"></div>
-          <div id="packs-grid" class="packs-grid"></div>
-          <hr class="sep" />
-          <h3><img class="px-icon" src="/static/assets/items/poke-ball.png" alt="" /> PokéMart — Bóng Bắt, Vé Gacha & Vật Phẩm</h3>
-          <div id="pokemart-grid" class="pokemart-grid"></div>
+          <div class="kecleon-shop-shell">
+            <div class="kecleon-banner-wrap">
+              <img class="kecleon-banner-img" src="/static/assets/ui/kecleon_shop_banner.png" alt="Kecleon Shop" />
+              <div class="kecleon-speech">Xin chào! Cứ xem thoải mái nhé!</div>
+              <div class="kecleon-sign-overlay">Kecleon Shop</div>
+            </div>
+            <div class="kecleon-shop-panel">
+              <div class="kecleon-panel-head">
+                <div>
+                  <h2 class="kecleon-title">Kecleon Shop</h2>
+                  <p class="kecleon-subtitle">Chào mừng! Vật phẩm bạn mua sẽ được cất thẳng vào Túi Đồ.</p>
+                </div>
+              </div>
+              <div class="kecleon-tabs-row">
+                <button type="button" class="kecleon-tab-btn active" id="kshop-tab-items" onclick="switchKecleonTab('items')">🎒 Vật Phẩm</button>
+                <button type="button" class="kecleon-tab-btn" id="kshop-tab-packs" onclick="switchKecleonTab('packs')">🃏 Gói Thẻ TCG</button>
+              </div>
+              <p class="kecleon-tip" id="kshop-tip">💡 Bấm nút tiền Vàng để mua ×1 hoặc chọn nhanh ×10 / ×100 cho Bóng, Thuốc &amp; Vé Gacha.</p>
+
+              <div id="kshop-items-pane">
+                <div id="pokemart-grid" class="kecleon-items-grid"></div>
+              </div>
+              <div id="kshop-packs-pane" class="hidden">
+                <div id="pack-reveal-stage" class="pack-reveal-stage hidden" style="margin-bottom:16px;"></div>
+                <div id="packs-grid" class="packs-grid"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
